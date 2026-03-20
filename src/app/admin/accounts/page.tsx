@@ -13,7 +13,9 @@ import {
   ArrowUpDown,
   UserPlus,
   Loader2,
-  CheckCircle
+  CheckCircle,
+  Settings,
+  Save
 } from 'lucide-react';
 import { 
   Table, 
@@ -31,14 +33,25 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
 import { collection, query, doc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AccountManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingUser, setEditingUser] = useState<any>(null);
   const db = useFirestore();
   const router = useRouter();
+  const { toast } = useToast();
 
   const accountsQuery = useMemoFirebase(() => {
     return query(collection(db, 'userProfiles'));
@@ -59,6 +72,26 @@ export default function AccountManagementPage() {
     const userRef = doc(db, 'userProfiles', userId);
     const newStatus = currentStatus === 'active' ? 'blocked' : 'active';
     updateDocumentNonBlocking(userRef, { accountStatus: newStatus });
+    toast({
+      title: "Status Updated",
+      description: `User account is now ${newStatus}.`,
+    });
+  };
+
+  const handleUpdateUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    const userRef = doc(db, 'userProfiles', editingUser.id);
+    const { id, ...updateData } = editingUser;
+    
+    updateDocumentNonBlocking(userRef, updateData);
+    
+    toast({
+      title: "Profile Updated",
+      description: `${editingUser.fullName}'s profile has been saved.`,
+    });
+    setEditingUser(null);
   };
 
   if (isLoading) {
@@ -157,21 +190,109 @@ export default function AccountManagementPage() {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => toggleStatus(account.id, account.accountStatus)}
-                      className={account.accountStatus === 'active' ? "text-yellow-500 hover:bg-yellow-500/10" : "text-green-500 hover:bg-green-500/10"}
-                      title={account.accountStatus === 'active' ? "Block User" : "Unblock User"}
-                    >
-                      {account.accountStatus === 'active' ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setEditingUser(account)}
+                        className="text-white hover:bg-white/10"
+                        title="User Settings"
+                      >
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => toggleStatus(account.id, account.accountStatus)}
+                        className={account.accountStatus === 'active' ? "text-yellow-500 hover:bg-yellow-500/10" : "text-green-500 hover:bg-green-500/10"}
+                        title={account.accountStatus === 'active' ? "Block User" : "Unblock User"}
+                      >
+                        {account.accountStatus === 'active' ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </Card>
+
+        {/* Edit User Dialog */}
+        <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
+          <DialogContent className="bg-card border-white/10 text-white sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold font-headline">User Settings</DialogTitle>
+              <p className="text-sm text-muted-foreground">Modify profile details for {editingUser?.fullName}</p>
+            </DialogHeader>
+            {editingUser && (
+              <form onSubmit={handleUpdateUser} className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-name">Full Name</Label>
+                    <Input 
+                      id="edit-name" 
+                      value={editingUser.fullName} 
+                      onChange={(e) => setEditingUser({...editingUser, fullName: e.target.value})}
+                      className="bg-black/20 border-white/5 text-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-id">ID Number</Label>
+                    <Input 
+                      id="edit-id" 
+                      value={editingUser.idNumber} 
+                      onChange={(e) => setEditingUser({...editingUser, idNumber: e.target.value})}
+                      className="bg-black/20 border-white/5 text-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-role">Role</Label>
+                    <Select 
+                      value={editingUser.role} 
+                      onValueChange={(v) => setEditingUser({...editingUser, role: v})}
+                    >
+                      <SelectTrigger className="bg-black/20 border-white/5 text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Student">Student</SelectItem>
+                        <SelectItem value="Faculty">Faculty</SelectItem>
+                        <SelectItem value="Employee">Employee</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-college">College</Label>
+                    <Input 
+                      id="edit-college" 
+                      value={editingUser.college} 
+                      onChange={(e) => setEditingUser({...editingUser, college: e.target.value})}
+                      className="bg-black/20 border-white/5 text-white"
+                    />
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label htmlFor="edit-program">Program</Label>
+                    <Input 
+                      id="edit-program" 
+                      value={editingUser.program || ''} 
+                      onChange={(e) => setEditingUser({...editingUser, program: e.target.value})}
+                      className="bg-black/20 border-white/5 text-white"
+                    />
+                  </div>
+                </div>
+                <DialogFooter className="pt-6">
+                  <Button type="button" variant="ghost" onClick={() => setEditingUser(null)} className="text-white hover:bg-white/5">
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="gap-2">
+                    <Save className="h-4 w-4" />
+                    Save Changes
+                  </Button>
+                </DialogFooter>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
