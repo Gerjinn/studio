@@ -37,11 +37,14 @@ import { format, isToday, isThisWeek, isThisMonth, parseISO } from 'date-fns';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
+import { exportToExcel } from '@/lib/export-utils';
+import { useToast } from '@/hooks/use-toast';
 
 export default function DashboardPage() {
   const db = useFirestore();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const { toast } = useToast();
   
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -103,6 +106,34 @@ export default function DashboardPage() {
     return visits?.slice(0, 10) || [];
   }, [visits]);
 
+  const handleExport = () => {
+    if (!visits || visits.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Export Error",
+        description: "No visit logs available to export.",
+      });
+      return;
+    }
+
+    const exportData = visits.map(v => ({
+      'Visitor Name': v.visitorFullName,
+      'ID Number': v.visitorIdNumber,
+      'Email': v.visitorEmail,
+      'Role': v.visitorRole,
+      'College': v.visitorCollege,
+      'Purpose': v.categorizedPurpose || v.purpose,
+      'Entry Time': v.entryTime ? format(parseISO(v.entryTime), 'MMMM d, yyyy h:mm a') : 'N/A',
+    }));
+
+    exportToExcel(exportData, `NEU_Library_Report_${format(new Date(), 'yyyy-MM-dd')}`);
+    
+    toast({
+      title: "Report Exported",
+      description: "Dashboard data has been exported to Excel.",
+    });
+  };
+
   if (isUserLoading || (user && isLogsLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#1a2c38]">
@@ -125,9 +156,9 @@ export default function DashboardPage() {
               <Calendar className="h-4 w-4" />
               {format(new Date(), 'MMMM d, yyyy')}
             </Button>
-            <Button className="gap-2 shadow-lg shadow-primary/20">
+            <Button onClick={handleExport} className="gap-2 shadow-lg shadow-primary/20">
               <Download className="h-4 w-4" />
-              Export Reports
+              Export Excel
             </Button>
           </div>
         </header>

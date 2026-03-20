@@ -38,6 +38,7 @@ import { useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking
 import { collection, query, orderBy, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { COLLEGES } from '@/lib/mock-data';
+import { exportToExcel } from '@/lib/export-utils';
 
 export default function VisitorLogPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -56,8 +57,8 @@ export default function VisitorLogPage() {
     if (!visits) return [];
     return visits.filter(v => {
       const matchesSearch = 
-        v.visitorFullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        v.visitorIdNumber.includes(searchTerm) ||
+        v.visitorFullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        v.visitorIdNumber?.includes(searchTerm) ||
         v.visitorEmail?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesRole = roleFilter === 'all' || v.visitorRole === roleFilter;
@@ -78,6 +79,35 @@ export default function VisitorLogPage() {
     }
   };
 
+  const handleExport = () => {
+    if (!filteredVisits || filteredVisits.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Export Error",
+        description: "No data available to export.",
+      });
+      return;
+    }
+
+    const exportData = filteredVisits.map(v => ({
+      'Visitor Name': v.visitorFullName,
+      'ID Number': v.visitorIdNumber,
+      'Email': v.visitorEmail,
+      'Role': v.visitorRole,
+      'College': v.visitorCollege,
+      'Purpose': v.categorizedPurpose || v.purpose,
+      'Date': v.entryTime ? format(parseISO(v.entryTime), 'MMMM d, yyyy') : 'N/A',
+      'Time': v.entryTime ? format(parseISO(v.entryTime), 'h:mm a') : 'N/A',
+    }));
+
+    exportToExcel(exportData, `NEU_Library_VisitorLog_${format(new Date(), 'yyyy-MM-dd')}`);
+    
+    toast({
+      title: "Export Success",
+      description: "Excel file has been generated.",
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#1a2c38]">
@@ -95,9 +125,9 @@ export default function VisitorLogPage() {
             <h1 className="text-3xl font-bold font-headline text-white">Visitor Log</h1>
             <p className="text-muted-foreground">Complete history of all library visits.</p>
           </div>
-          <Button className="gap-2 shadow-lg shadow-primary/20">
+          <Button onClick={handleExport} className="gap-2 shadow-lg shadow-primary/20">
             <Download className="h-4 w-4" />
-            Export CSV
+            Export Excel
           </Button>
         </header>
 
@@ -166,11 +196,6 @@ export default function VisitorLogPage() {
               <Activity className="h-5 w-5 text-primary" />
               Showing {filteredVisits.length} Records
             </CardTitle>
-            <div className="flex gap-1">
-              <Button variant="outline" size="sm" className="h-8 w-8 p-0"><ChevronLeft className="h-4 w-4" /></Button>
-              <Button variant="outline" size="sm" className="h-8 w-8 p-0 bg-primary text-white border-primary">1</Button>
-              <Button variant="outline" size="sm" className="h-8 w-8 p-0"><ChevronRight className="h-4 w-4" /></Button>
-            </div>
           </CardHeader>
           <Table>
             <TableHeader className="bg-white/2 hover:bg-transparent">
@@ -189,10 +214,10 @@ export default function VisitorLogPage() {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                        {v.visitorFullName.charAt(0)}
+                        {v.visitorFullName?.charAt(0) || '?'}
                       </div>
                       <div>
-                        <p className="font-bold text-white leading-tight">{v.visitorFullName}</p>
+                        <p className="font-bold text-white leading-tight">{v.visitorFullName || 'Unknown'}</p>
                         <p className="text-xs text-muted-foreground uppercase font-medium">{v.visitorIdNumber}</p>
                       </div>
                     </div>
