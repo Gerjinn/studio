@@ -33,26 +33,23 @@ export function AdminSidebar() {
       const profileRef = doc(db, 'userProfiles', user.uid);
       const adminRef = doc(db, 'roles_admin', user.uid);
       
-      getDoc(profileRef).then((snap) => {
-        if (!snap.exists()) {
-          setDocumentNonBlocking(profileRef, {
-            id: user.uid,
-            institutionalEmail: user.email,
-            fullName: user.displayName || 'Main Administrator',
-            idNumber: 'ADMIN-MASTER',
-            role: 'Admin',
-            college: 'Administration',
-            accountStatus: 'active',
-            createdAt: new Date().toISOString()
-          }, { merge: true });
+      // Idempotent bootstrap: Ensure both profile and admin record exist for the master account
+      setDocumentNonBlocking(profileRef, {
+        id: user.uid,
+        institutionalEmail: user.email,
+        fullName: user.displayName || 'Main Administrator',
+        idNumber: 'ADMIN-MASTER',
+        role: 'Admin',
+        college: 'Administration',
+        accountStatus: 'active',
+        createdAt: new Date().toISOString()
+      }, { merge: true });
 
-          setDocumentNonBlocking(adminRef, {
-            email: user.email,
-            assignedAt: new Date().toISOString(),
-            isMaster: true
-          }, { merge: true });
-        }
-      });
+      setDocumentNonBlocking(adminRef, {
+        email: user.email,
+        assignedAt: new Date().toISOString(),
+        isMaster: true
+      }, { merge: true });
     }
   }, [user, isUserLoading, db]);
 
