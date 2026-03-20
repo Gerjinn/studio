@@ -11,17 +11,12 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    // Admin check: 
-    // 1. Explicitly defined in the roles_admin collection
-    // 2. OR possesses a valid institutional email domain (bootstrap/prototype access)
+    // Admin/Staff check: 
+    // Users with an institutional email are granted administrative access to manage logs and profiles.
     function isAdmin() {
       return isSignedIn() && (
-        exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) ||
-        (request.auth.token.email != null && request.auth.token.email.matches('^.*@neu\\.edu\\.ph$'))
+        request.auth.token.email != null && 
+        request.auth.token.email.matches('^.*@neu\\.edu\\.ph$')
       );
     }
 
@@ -31,18 +26,18 @@ service cloud.firestore {
     }
 
     match /userProfiles/{userId} {
-      // Allow list and get for everyone to support finding profiles by institutional email during library entry
+      // Publicly allowed to list and get to support email verification during library entry
       allow list, get: if true;
       
-      // Strict: Only admins can manage (add/edit/delete) user profiles
+      // Only admins/staff can manage user profiles
       allow create, update, delete: if isAdmin();
     }
 
     match /visitLogs/{visitLogId} {
-      // Admins have full access to view and manage logs
+      // Only admins and staff can view the complete visitor log and dashboard statistics
       allow get, list, update, delete: if isAdmin();
       
-      // Anyone can create a visit log (visitors checking in)
+      // Publicly allowed to create a log entry (visitors checking in)
       allow create: if true; 
     }
 

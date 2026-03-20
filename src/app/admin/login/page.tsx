@@ -23,7 +23,6 @@ export default function AdminLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // If user is already logged in with the correct domain, redirect to dashboard
     if (!isUserLoading && user && user.email?.endsWith('@neu.edu.ph')) {
       router.push('/admin/dashboard');
     }
@@ -79,7 +78,7 @@ export default function AdminLoginPage() {
           </div>
           <CardTitle className="text-3xl font-bold text-white font-headline">Admin Portal</CardTitle>
           <CardDescription className="text-white/60">
-            Secure access for NEU Library Administrators
+            Secure access for NEU Library Admins & Staff
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -126,9 +125,8 @@ export default function AdminLoginPage() {
             </Button>
           </form>
 
-          <div className="mt-8 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-xs text-yellow-200/80 leading-relaxed">
-            <p className="font-bold mb-1 uppercase tracking-wider text-yellow-500">Notice</p>
-            This system is for authorized personnel only. All access attempts are monitored and recorded by the NEU IT Department.
+          <div className="mt-8 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-xs text-yellow-200/80 leading-relaxed text-center">
+            Authorized Personnel Only
           </div>
         </CardContent>
       </Card>

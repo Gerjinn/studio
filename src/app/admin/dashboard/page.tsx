@@ -10,7 +10,6 @@ import {
   Calendar, 
   Download, 
   TrendingUp, 
-  MoreVertical,
   Loader2
 } from 'lucide-react';
 import { 
@@ -101,7 +100,7 @@ export default function DashboardPage() {
   }, [visits]);
 
   const recentVisits = useMemo(() => {
-    return visits?.slice(0, 5) || [];
+    return visits?.slice(0, 10) || [];
   }, [visits]);
 
   if (isUserLoading || (user && isLogsLoading)) {
@@ -119,7 +118,7 @@ export default function DashboardPage() {
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold font-headline text-white">Dashboard Overview</h1>
-            <p className="text-muted-foreground">Administrative insights for EpochReads.</p>
+            <p className="text-muted-foreground">Live insights for NEU Library Staff.</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" className="bg-card border-border/50 text-white gap-2">
@@ -160,7 +159,7 @@ export default function DashboardPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-lg font-bold">Visitors by College</CardTitle>
-                <p className="text-xs text-muted-foreground">Live distribution</p>
+                <p className="text-xs text-muted-foreground">Distribution of library users</p>
               </div>
             </CardHeader>
             <CardContent>
@@ -197,7 +196,7 @@ export default function DashboardPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-lg font-bold">Visit Purposes</CardTitle>
-                <p className="text-xs text-muted-foreground">Activity breakdown</p>
+                <p className="text-xs text-muted-foreground">Top reasons for visiting</p>
               </div>
             </CardHeader>
             <CardContent>
@@ -229,7 +228,7 @@ export default function DashboardPage() {
 
         <Card className="bg-card/30 border-white/5">
           <CardHeader>
-            <CardTitle className="text-lg font-bold">Recent Activity</CardTitle>
+            <CardTitle className="text-lg font-bold">Recent Visitor Entries</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
@@ -243,7 +242,7 @@ export default function DashboardPage() {
               <TableBody>
                 {recentVisits.map((v) => (
                   <TableRow key={v.id} className="border-white/5">
-                    <TableCell className="text-white">{v.visitorFullName}</TableCell>
+                    <TableCell className="text-white font-medium">{v.visitorFullName}</TableCell>
                     <TableCell className="text-muted-foreground">{v.entryTime ? format(parseISO(v.entryTime), 'h:mm a') : 'N/A'}</TableCell>
                     <TableCell className="text-primary font-bold">{v.categorizedPurpose || v.purpose}</TableCell>
                   </TableRow>
