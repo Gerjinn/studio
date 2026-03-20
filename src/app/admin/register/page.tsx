@@ -9,8 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/Logo';
 import { ArrowLeft, Loader2, UserPlus } from 'lucide-react';
-import { useAuth, useFirestore } from '@/firebase';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { useFirestore } from '@/firebase';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { firebaseConfig } from '@/firebase/config';
 import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,7 +20,6 @@ import { COLLEGES } from '@/lib/mock-data';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const auth = useAuth();
   const db = useFirestore();
   const { toast } = useToast();
 
@@ -53,14 +54,20 @@ export default function RegisterPage() {
     }
 
     setIsLoading(true);
-    try {
-      // 1. Create Auth User
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-      const user = userCredential.user;
+    
+    // Create a secondary app instance to prevent the admin from being logged out
+    const tempAppName = `temp-reg-${Date.now()}`;
+    const secondaryApp = initializeApp(firebaseConfig, tempAppName);
+    const secondaryAuth = getAuth(secondaryApp);
 
-      // 2. Create User Profile in Firestore
-      await setDoc(doc(db, 'userProfiles', user.uid), {
-        id: user.uid,
+    try {
+      // 1. Create Auth User using the secondary instance
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, formData.email, formData.password);
+      const newUser = userCredential.user;
+
+      // 2. Create User Profile in Firestore using the primary db instance
+      await setDoc(doc(db, 'userProfiles', newUser.uid), {
+        id: newUser.uid,
         institutionalEmail: formData.email,
         fullName: formData.fullName,
         idNumber: formData.idNumber,
@@ -82,6 +89,8 @@ export default function RegisterPage() {
         description: error.message || "An error occurred during registration.",
       });
     } finally {
+      // Clean up the secondary app instance
+      await deleteApp(secondaryApp);
       setIsLoading(false);
     }
   };
