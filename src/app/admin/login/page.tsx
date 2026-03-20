@@ -117,7 +117,10 @@ export default function AdminLoginPage() {
               type="submit" 
               className="w-full h-12 text-lg font-bold"
               disabled={!email.includes('@neu.edu.ph') || isLoading}
-            ) : (
+            >
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
                 'Secure Login'
               )}
             </Button>
