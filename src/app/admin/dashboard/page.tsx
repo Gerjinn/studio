@@ -1,18 +1,15 @@
 
 "use client"
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { AdminSidebar } from '@/components/admin/Sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { 
   Users, 
   Calendar, 
-  Search, 
   Download, 
   TrendingUp, 
-  Filter,
   MoreVertical,
   Loader2
 } from 'lucide-react';
@@ -38,27 +35,51 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { format, isToday, isThisWeek, isThisMonth, parseISO } from 'date-fns';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, limit } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { collection, query, orderBy, doc, setDoc } from 'firebase/firestore';
+import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
   const db = useFirestore();
+  const { user, isUserLoading } = useUser();
+  const router = useRouter();
   
-  const visitsQuery = useMemoFirebase(() => {
-    return query(collection(db, 'visitLogs'), orderBy('entryTime', 'desc'));
-  }, [db]);
+  // Ensure the admin role document exists if they land here
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/admin/login');
+      return;
+    }
+    
+    if (user && user.email?.endsWith('@neu.edu.ph')) {
+      const adminRef = doc(db, 'roles_admin', user.uid);
+      setDoc(adminRef, {
+        email: user.email,
+        lastLogin: new Date().toISOString()
+      }, { merge: true });
+    }
+  }, [user, isUserLoading, router, db]);
 
-  const { data: visits, isLoading } = useCollection(visitsQuery);
+  const visitsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(collection(db, 'visitLogs'), orderBy('entryTime', 'desc'));
+  }, [db, user]);
+
+  const { data: visits, isLoading: isLogsLoading } = useCollection(visitsQuery);
 
   // Derived statistics
   const stats = useMemo(() => {
     if (!visits) return { today: 0, week: 0, month: 0 };
     
     return visits.reduce((acc, visit) => {
-      const date = parseISO(visit.entryTime);
-      if (isToday(date)) acc.today++;
-      if (isThisWeek(date)) acc.week++;
-      if (isThisMonth(date)) acc.month++;
+      try {
+        const date = parseISO(visit.entryTime);
+        if (isToday(date)) acc.today++;
+        if (isThisWeek(date)) acc.week++;
+        if (isThisMonth(date)) acc.month++;
+      } catch (e) {
+        // Skip malformed dates
+      }
       return acc;
     }, { today: 0, week: 0, month: 0 });
   }, [visits]);
@@ -67,7 +88,9 @@ export default function DashboardPage() {
     if (!visits) return [];
     const counts: Record<string, number> = {};
     visits.forEach(v => {
-      counts[v.visitorCollege] = (counts[v.visitorCollege] || 0) + 1;
+      if (v.visitorCollege) {
+        counts[v.visitorCollege] = (counts[v.visitorCollege] || 0) + 1;
+      }
     });
     return COLLEGES.map((college, idx) => ({
       name: college,
@@ -80,7 +103,8 @@ export default function DashboardPage() {
     if (!visits) return [];
     const counts: Record<string, number> = {};
     visits.forEach(v => {
-      counts[v.categorizedPurpose || v.purpose] = (counts[v.categorizedPurpose || v.purpose] || 0) + 1;
+      const p = v.categorizedPurpose || v.purpose;
+      if (p) counts[p] = (counts[p] || 0) + 1;
     });
     return VISIT_PURPOSES.map((purpose, idx) => ({
       name: purpose,
@@ -93,7 +117,7 @@ export default function DashboardPage() {
     return visits?.slice(0, 5) || [];
   }, [visits]);
 
-  if (isLoading) {
+  if (isUserLoading || (user && isLogsLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#1a2c38]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -257,7 +281,7 @@ export default function DashboardPage() {
                     <TableCell className="font-medium text-white">{v.visitorFullName}</TableCell>
                     <TableCell className="text-muted-foreground">{v.visitorIdNumber}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {format(parseISO(v.entryTime), 'h:mm a, MMM d')}
+                      {v.entryTime ? format(parseISO(v.entryTime), 'h:mm a, MMM d') : 'N/A'}
                     </TableCell>
                     <TableCell className="text-white">
                       <span className="bg-primary/20 text-primary px-2 py-0.5 rounded text-[10px] font-bold uppercase">

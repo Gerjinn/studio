@@ -26,10 +26,17 @@ export default function AdminLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (!isUserLoading && user) {
+    if (!isUserLoading && user && user.email?.endsWith('@neu.edu.ph')) {
+      // Ensure the admin role document exists if they are already logged in
+      const adminRef = doc(db, 'roles_admin', user.uid);
+      setDoc(adminRef, {
+        email: user.email,
+        lastLogin: new Date().toISOString()
+      }, { merge: true });
+      
       router.push('/admin/dashboard');
     }
-  }, [user, isUserLoading, router]);
+  }, [user, isUserLoading, router, db]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +53,7 @@ export default function AdminLoginPage() {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
-      // For the prototype, ensure the user has an admin role entry upon login
+      // Ensure the user has an admin role entry upon login
       await setDoc(doc(db, 'roles_admin', userCredential.user.uid), {
         email: userCredential.user.email,
         lastLogin: new Date().toISOString()
