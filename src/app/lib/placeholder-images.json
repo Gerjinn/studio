@@ -1,0 +1,17 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "neu-logo",
+      "description": "New Era University official-style seal logo",
+      "imageUrl": "https://picsum.photos/seed/neu-seal/200/200",
+      "imageHint": "university seal"
+    },
+    {
+      "id": "library-hero",
+      "description": "Modern university library interior",
+      "imageUrl": "https://picsum.photos/seed/library-interior/1200/800",
+      "imageHint": "university library"
+    }
+  ]
+}
