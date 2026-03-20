@@ -44,7 +44,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from '@/firebase';
 import { collection, query, doc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -56,6 +56,7 @@ export default function AccountManagementPage() {
   const [collegeFilter, setCollegeFilter] = useState('all');
   const [editingUser, setEditingUser] = useState<any>(null);
   const db = useFirestore();
+  const { user: currentUser } = useUser();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -150,17 +151,27 @@ export default function AccountManagementPage() {
   };
 
   const handleDeleteUser = (userId: string) => {
-    if (confirm('Are you sure you want to delete this user profile? This action cannot be undone.')) {
+    if (userId === currentUser?.uid) {
+      toast({
+        variant: "destructive",
+        title: "Action Denied",
+        description: "You cannot delete your own administrative account.",
+      });
+      return;
+    }
+
+    if (confirm('Are you sure you want to delete this user profile? This will remove all their access and visit history connections.')) {
       const userRef = doc(db, 'userProfiles', userId);
       const adminRef = doc(db, 'roles_admin', userId);
       
+      // Trigger deletions
       deleteDocumentNonBlocking(userRef);
       deleteDocumentNonBlocking(adminRef);
       
       toast({
         variant: "destructive",
         title: "Account Deleted",
-        description: "The user profile and associated roles have been removed.",
+        description: "The user profile and associated permissions have been removed.",
       });
       setEditingUser(null);
     }
@@ -314,6 +325,7 @@ export default function AccountManagementPage() {
                           variant="ghost" 
                           size="sm" 
                           onClick={() => handleDeleteUser(account.id)}
+                          disabled={account.id === currentUser?.uid}
                           className="text-destructive hover:bg-destructive/10"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -405,6 +417,7 @@ export default function AccountManagementPage() {
                     type="button" 
                     variant="ghost" 
                     onClick={() => handleDeleteUser(editingUser.id)}
+                    disabled={editingUser.id === currentUser?.uid}
                     className="text-destructive hover:bg-destructive/10 order-last sm:order-first"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
