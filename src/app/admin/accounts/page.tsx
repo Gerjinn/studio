@@ -16,8 +16,6 @@ import {
   CheckCircle,
   Settings,
   Save,
-  ShieldAlert,
-  ShieldMinus,
   Trash2
 } from 'lucide-react';
 import { 
@@ -49,6 +47,7 @@ import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking
 import { collection, query, doc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+import { COLLEGES } from '@/lib/mock-data';
 
 export default function AccountManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -78,7 +77,7 @@ export default function AccountManagementPage() {
     return accounts.filter(acc => 
       acc.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       acc.idNumber.includes(searchTerm) ||
-      acc.college.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      acc.college?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       acc.institutionalEmail.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [accounts, searchTerm]);
@@ -305,11 +304,21 @@ export default function AccountManagementPage() {
                   </div>
                   <div className="space-y-2 col-span-2">
                     <Label>College</Label>
-                    <Input 
+                    <Select 
                       value={editingUser.college} 
-                      onChange={(e) => setEditingUser({...editingUser, college: e.target.value})}
-                      className="bg-black/20 border-white/10"
-                    />
+                      onValueChange={(v) => setEditingUser({...editingUser, college: v})}
+                    >
+                      <SelectTrigger className="bg-black/20 border-white/10">
+                        <SelectValue placeholder="Select college" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COLLEGES.map((college) => (
+                          <SelectItem key={college} value={college}>
+                            {college}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 

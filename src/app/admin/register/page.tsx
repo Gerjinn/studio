@@ -3,7 +3,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,6 +14,7 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { COLLEGES } from '@/lib/mock-data';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -43,6 +43,15 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!formData.college) {
+      toast({
+        variant: "destructive",
+        title: "Missing Information",
+        description: "Please select a college.",
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
       // 1. Create Auth User
@@ -60,15 +69,9 @@ export default function RegisterPage() {
         accountStatus: 'active',
       });
 
-      // 3. Grant Admin Role by default for registration through this portal
-      await setDoc(doc(db, 'roles_admin', user.uid), {
-        email: formData.email,
-        assignedAt: new Date().toISOString()
-      });
-
       toast({
         title: "Account Created",
-        description: "User profile and admin privileges have been registered successfully.",
+        description: "User profile has been registered successfully.",
       });
       
       router.push('/admin/accounts');
@@ -167,13 +170,18 @@ export default function RegisterPage() {
 
               <div className="space-y-2">
                 <Label className="text-white/80">College</Label>
-                <Input
-                  required
-                  placeholder="e.g. CICS"
-                  value={formData.college}
-                  onChange={(e) => setFormData({ ...formData, college: e.target.value })}
-                  className="bg-black/20 border-white/10 text-white h-12"
-                />
+                <Select onValueChange={(v) => setFormData({ ...formData, college: v })}>
+                  <SelectTrigger className="bg-black/20 border-white/10 text-white h-12">
+                    <SelectValue placeholder="Select college" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COLLEGES.map((college) => (
+                      <SelectItem key={college} value={college}>
+                        {college}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

@@ -39,6 +39,7 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function VisitorLogPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
   const db = useFirestore();
   const { toast } = useToast();
 
@@ -50,12 +51,17 @@ export default function VisitorLogPage() {
 
   const filteredVisits = useMemo(() => {
     if (!visits) return [];
-    return visits.filter(v => 
-      v.visitorFullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.visitorIdNumber.includes(searchTerm) ||
-      v.visitorEmail.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [visits, searchTerm]);
+    return visits.filter(v => {
+      const matchesSearch = 
+        v.visitorFullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        v.visitorIdNumber.includes(searchTerm) ||
+        v.visitorEmail?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesRole = roleFilter === 'all' || v.visitorRole === roleFilter;
+      
+      return matchesSearch && matchesRole;
+    });
+  }, [visits, searchTerm, roleFilter]);
 
   const handleDeleteLog = (logId: string) => {
     if (confirm('Are you sure you want to delete this visit log?')) {
@@ -98,16 +104,17 @@ export default function VisitorLogPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
                   placeholder="Search Name, ID, or Email..." 
-                  className="pl-9 bg-card border-white/10"
+                  className="pl-9 bg-card border-white/10 text-white"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <Select>
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
                 <SelectTrigger className="bg-card border-white/10 text-white">
                   <SelectValue placeholder="All Roles" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="Student">Students</SelectItem>
                   <SelectItem value="Faculty">Faculty</SelectItem>
                   <SelectItem value="Employee">Employee</SelectItem>
@@ -169,8 +176,8 @@ export default function VisitorLogPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <p className="text-white font-medium">{format(parseISO(v.entryTime), 'h:mm a')}</p>
-                    <p className="text-[10px] text-muted-foreground">{format(parseISO(v.entryTime), 'MMMM d, yyyy')}</p>
+                    <p className="text-white font-medium">{v.entryTime ? format(parseISO(v.entryTime), 'h:mm a') : 'N/A'}</p>
+                    <p className="text-[10px] text-muted-foreground">{v.entryTime ? format(parseISO(v.entryTime), 'MMMM d, yyyy') : ''}</p>
                   </TableCell>
                   <TableCell className="text-right">
                     <Button 
