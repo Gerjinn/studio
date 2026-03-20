@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { AdminSidebar } from '@/components/admin/Sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,8 @@ import {
   Download, 
   TrendingUp, 
   Filter,
-  MoreVertical
+  MoreVertical,
+  Loader2
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -27,7 +28,7 @@ import {
   PieChart,
   Pie
 } from 'recharts';
-import { MOCK_VISITORS, COLLEGES, VISIT_PURPOSES } from '@/lib/mock-data';
+import { COLLEGES, VISIT_PURPOSES } from '@/lib/mock-data';
 import { 
   Table, 
   TableBody, 
@@ -36,22 +37,69 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { format } from 'date-fns';
-
-const collegeData = COLLEGES.map((college, idx) => ({
-  name: college,
-  visitors: Math.floor(Math.random() * 50) + 10,
-  fill: `hsl(var(--chart-${(idx % 5) + 1}))`
-}));
-
-const purposeData = VISIT_PURPOSES.map((purpose, idx) => ({
-  name: purpose,
-  value: Math.floor(Math.random() * 40) + 5,
-  fill: `hsl(var(--chart-${(idx % 5) + 1}))`
-}));
+import { format, isToday, isThisWeek, isThisMonth, parseISO } from 'date-fns';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
 
 export default function DashboardPage() {
-  const [searchTerm, setSearchTerm] = useState('');
+  const db = useFirestore();
+  
+  const visitsQuery = useMemoFirebase(() => {
+    return query(collection(db, 'visitLogs'), orderBy('entryTime', 'desc'));
+  }, [db]);
+
+  const { data: visits, isLoading } = useCollection(visitsQuery);
+
+  // Derived statistics
+  const stats = useMemo(() => {
+    if (!visits) return { today: 0, week: 0, month: 0 };
+    
+    return visits.reduce((acc, visit) => {
+      const date = parseISO(visit.entryTime);
+      if (isToday(date)) acc.today++;
+      if (isThisWeek(date)) acc.week++;
+      if (isThisMonth(date)) acc.month++;
+      return acc;
+    }, { today: 0, week: 0, month: 0 });
+  }, [visits]);
+
+  const collegeChartData = useMemo(() => {
+    if (!visits) return [];
+    const counts: Record<string, number> = {};
+    visits.forEach(v => {
+      counts[v.visitorCollege] = (counts[v.visitorCollege] || 0) + 1;
+    });
+    return COLLEGES.map((college, idx) => ({
+      name: college,
+      visitors: counts[college] || 0,
+      fill: `hsl(var(--chart-${(idx % 5) + 1}))`
+    })).sort((a, b) => b.visitors - a.visitors);
+  }, [visits]);
+
+  const purposeChartData = useMemo(() => {
+    if (!visits) return [];
+    const counts: Record<string, number> = {};
+    visits.forEach(v => {
+      counts[v.categorizedPurpose || v.purpose] = (counts[v.categorizedPurpose || v.purpose] || 0) + 1;
+    });
+    return VISIT_PURPOSES.map((purpose, idx) => ({
+      name: purpose,
+      value: counts[purpose] || 0,
+      fill: `hsl(var(--chart-${(idx % 5) + 1}))`
+    })).filter(d => d.value > 0);
+  }, [visits]);
+
+  const recentVisits = useMemo(() => {
+    return visits?.slice(0, 5) || [];
+  }, [visits]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#1a2c38]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex bg-[#1a2c38]">
@@ -65,7 +113,7 @@ export default function DashboardPage() {
           <div className="flex gap-2">
             <Button variant="outline" className="bg-card border-border/50 text-white gap-2">
               <Calendar className="h-4 w-4" />
-              May 20, 2024
+              {format(new Date(), 'MMMM d, yyyy')}
             </Button>
             <Button className="gap-2 shadow-lg shadow-primary/20">
               <Download className="h-4 w-4" />
@@ -77,9 +125,9 @@ export default function DashboardPage() {
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {[
-            { label: 'Total Visitors Today', value: '124', icon: Users, trend: '+12%' },
-            { label: 'This Week', value: '842', icon: TrendingUp, trend: '+5%' },
-            { label: 'This Month', value: '3,120', icon: Calendar, trend: '+18%' },
+            { label: 'Total Visitors Today', value: stats.today.toString(), icon: Users, trend: '+0%' },
+            { label: 'This Week', value: stats.week.toString(), icon: TrendingUp, trend: '+0%' },
+            { label: 'This Month', value: stats.month.toString(), icon: Calendar, trend: '+0%' },
           ].map((stat, i) => (
             <Card key={i} className="bg-card/30 border-white/5 backdrop-blur-md overflow-hidden relative group">
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -113,7 +161,7 @@ export default function DashboardPage() {
             <CardContent>
               <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={collegeData} layout="vertical">
+                  <BarChart data={collegeChartData} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
                     <XAxis type="number" hide />
                     <YAxis 
@@ -130,7 +178,7 @@ export default function DashboardPage() {
                       contentStyle={{backgroundColor: '#233c4b', border: 'none', borderRadius: '8px'}}
                     />
                     <Bar dataKey="visitors" radius={[0, 4, 4, 0]}>
-                      {collegeData.map((entry, index) => (
+                      {collegeChartData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Bar>
@@ -153,7 +201,7 @@ export default function DashboardPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={purposeData}
+                      data={purposeChartData}
                       cx="50%"
                       cy="50%"
                       innerRadius={60}
@@ -161,7 +209,7 @@ export default function DashboardPage() {
                       paddingAngle={5}
                       dataKey="value"
                     >
-                      {purposeData.map((entry, index) => (
+                      {purposeChartData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Pie>
@@ -171,7 +219,7 @@ export default function DashboardPage() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="grid grid-cols-2 gap-x-8 gap-y-2 ml-4">
-                  {purposeData.map((p) => (
+                  {purposeChartData.map((p) => (
                     <div key={p.name} className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full" style={{backgroundColor: p.fill}} />
                       <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{p.name}</span>
@@ -191,20 +239,6 @@ export default function DashboardPage() {
               <CardTitle className="text-lg font-bold">Recent Visits Log</CardTitle>
               <p className="text-xs text-muted-foreground">Live feed of library entries</p>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Search visitors..." 
-                  className="pl-9 bg-card/50 border-white/10 w-64 h-9 text-xs"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <Button variant="outline" size="sm" className="h-9 gap-2">
-                <Filter className="h-4 w-4" /> Filter
-              </Button>
-            </div>
           </CardHeader>
           <CardContent>
             <Table>
@@ -218,32 +252,27 @@ export default function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {MOCK_VISITORS.map((v) => (
+                {recentVisits.map((v) => (
                   <TableRow key={v.id} className="border-white/5 hover:bg-white/5">
-                    <TableCell className="font-medium text-white">{v.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{v.idNumber}</TableCell>
+                    <TableCell className="font-medium text-white">{v.visitorFullName}</TableCell>
+                    <TableCell className="text-muted-foreground">{v.visitorIdNumber}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {format(new Date(v.entryTime), 'h:mm a, MMM d')}
+                      {format(parseISO(v.entryTime), 'h:mm a, MMM d')}
                     </TableCell>
                     <TableCell className="text-white">
                       <span className="bg-primary/20 text-primary px-2 py-0.5 rounded text-[10px] font-bold uppercase">
-                        {v.program}
+                        {v.visitorProgram || 'N/A'}
                       </span>
                     </TableCell>
                     <TableCell>
                       <span className="bg-secondary/20 text-secondary px-2 py-0.5 rounded text-[10px] font-bold">
-                        {v.purpose}
+                        {v.categorizedPurpose || v.purpose}
                       </span>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-            <div className="mt-4 flex justify-center">
-              <Button variant="link" className="text-primary hover:text-primary/80 font-bold">
-                View All Visitor Logs
-              </Button>
-            </div>
           </CardContent>
         </Card>
       </main>

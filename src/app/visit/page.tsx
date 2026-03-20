@@ -8,40 +8,90 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
 import { VISIT_PURPOSES } from '@/lib/mock-data';
-import { CheckCircle2, ArrowLeft, Loader2 } from 'lucide-react';
+import { CheckCircle2, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { categorizeVisitPurpose } from '@/ai/flows/ai-purpose-categorization-flow';
 import { Textarea } from '@/components/ui/textarea';
+import { useFirestore, addDocumentNonBlocking } from '@/firebase';
+import { collection, query, where, getDocs, limit, serverTimestamp } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function VisitPage() {
   const router = useRouter();
+  const db = useFirestore();
+  const { toast } = useToast();
+  
   const [selectedPurpose, setSelectedPurpose] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [otherDescription, setOtherDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     if (!selectedPurpose || !email.includes('@neu.edu.ph')) return;
 
     setIsSubmitting(true);
 
     try {
+      // 1. Find User Profile by Email
+      const profilesRef = collection(db, 'userProfiles');
+      const q = query(profilesRef, where('institutionalEmail', '==', email), limit(1));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        setError("Institutional email not found. Please register your account first.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const userProfile = querySnapshot.docs[0].data();
+      
+      if (userProfile.accountStatus === 'blocked') {
+        setError("Your account has been restricted. Please contact the library administrator.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 2. AI Categorization if "Other"
+      let finalCategorizedPurpose = selectedPurpose;
       if (selectedPurpose === 'Other' && otherDescription) {
         const aiResult = await categorizeVisitPurpose({ otherPurposeDescription: otherDescription });
-        console.log('AI Categorized as:', aiResult.categorizedPurpose);
+        finalCategorizedPurpose = aiResult.categorizedPurpose;
       }
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // 3. Log Visit
+      const visitLogsRef = collection(db, 'visitLogs');
+      addDocumentNonBlocking(visitLogsRef, {
+        visitorId: userProfile.id,
+        entryTime: new Date().toISOString(), // Using ISO string as per backend.json format
+        purpose: selectedPurpose,
+        otherPurposeDetails: otherDescription || null,
+        categorizedPurpose: finalCategorizedPurpose,
+        // Denormalized fields for Admin efficiency
+        visitorFullName: userProfile.fullName,
+        visitorIdNumber: userProfile.idNumber,
+        visitorRole: userProfile.role,
+        visitorProgram: userProfile.program || null,
+        visitorCollege: userProfile.college,
+        visitorEmail: userProfile.institutionalEmail,
+        createdAt: serverTimestamp(),
+      });
+
       setShowSuccess(true);
-      
       setTimeout(() => {
         router.push('/');
       }, 3000);
-    } catch (error) {
-      console.error(error);
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        variant: "destructive",
+        title: "Submission Error",
+        description: err.message || "Failed to record your visit.",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -83,6 +133,21 @@ export default function VisitPage() {
           <h2 className="text-3xl font-bold mb-2 font-headline">Library Entry Log</h2>
           <p className="text-muted-foreground">Select your purpose of visit and enter your NEU institutional email.</p>
         </div>
+
+        {error && (
+          <Alert variant="destructive" className="mb-8 border-destructive/20 bg-destructive/10">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Action Required</AlertTitle>
+            <AlertDescription className="flex flex-col gap-2">
+              {error}
+              {error.includes("not found") && (
+                <Button variant="link" onClick={() => router.push('/admin/register')} className="text-destructive font-bold p-0 h-auto w-fit">
+                  Register here
+                </Button>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-8">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">

@@ -1,21 +1,20 @@
 
 "use client"
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { AdminSidebar } from '@/components/admin/Sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { 
   Search, 
-  Filter,
   Ban,
-  Trash2,
   ShieldCheck,
   ArrowUpDown,
-  UserPlus
+  UserPlus,
+  Loader2,
+  CheckCircle
 } from 'lucide-react';
-import { MOCK_ACCOUNTS } from '@/lib/mock-data';
 import { 
   Table, 
   TableBody, 
@@ -32,9 +31,43 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { collection, query, doc } from 'firebase/firestore';
+import { useRouter } from 'next/navigation';
 
 export default function AccountManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const db = useFirestore();
+  const router = useRouter();
+
+  const accountsQuery = useMemoFirebase(() => {
+    return query(collection(db, 'userProfiles'));
+  }, [db]);
+
+  const { data: accounts, isLoading } = useCollection(accountsQuery);
+
+  const filteredAccounts = useMemo(() => {
+    if (!accounts) return [];
+    return accounts.filter(acc => 
+      acc.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      acc.idNumber.includes(searchTerm) ||
+      acc.college.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [accounts, searchTerm]);
+
+  const toggleStatus = (userId: string, currentStatus: string) => {
+    const userRef = doc(db, 'userProfiles', userId);
+    const newStatus = currentStatus === 'active' ? 'blocked' : 'active';
+    updateDocumentNonBlocking(userRef, { accountStatus: newStatus });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#1a2c38]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex bg-[#1a2c38]">
@@ -45,9 +78,9 @@ export default function AccountManagementPage() {
             <h1 className="text-3xl font-bold font-headline text-white">Account Management</h1>
             <p className="text-muted-foreground">Manage user permissions and account status.</p>
           </div>
-          <Button className="gap-2 shadow-lg shadow-primary/20">
+          <Button onClick={() => router.push('/admin/register')} className="gap-2 shadow-lg shadow-primary/20">
             <UserPlus className="h-4 w-4" />
-            Add New Account
+            Register Account
           </Button>
         </header>
 
@@ -64,33 +97,20 @@ export default function AccountManagementPage() {
           </div>
           <Select>
             <SelectTrigger className="w-[180px] bg-card border-white/10 text-white">
-              <SelectValue placeholder="All Colleges" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="cics">CICS</SelectItem>
-              <SelectItem value="nursing">Nursing</SelectItem>
-              <SelectItem value="engineering">Engineering</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select>
-            <SelectTrigger className="w-[180px] bg-card border-white/10 text-white">
               <SelectValue placeholder="All Roles" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="student">Student</SelectItem>
-              <SelectItem value="staff">Staff</SelectItem>
-              <SelectItem value="faculty">Faculty</SelectItem>
+              <SelectItem value="Student">Student</SelectItem>
+              <SelectItem value="Faculty">Faculty</SelectItem>
+              <SelectItem value="Employee">Employee</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" className="border-white/10 text-white gap-2">
-            <Filter className="h-4 w-4" /> Sort By
-          </Button>
         </div>
 
         <Card className="bg-card/30 border-white/5">
           <CardHeader className="pb-2 border-b border-white/5">
             <div className="flex justify-between items-center">
-              <CardTitle className="text-lg font-bold">Total Accounts: {MOCK_ACCOUNTS.length}</CardTitle>
+              <CardTitle className="text-lg font-bold">Total Profiles: {filteredAccounts.length}</CardTitle>
               <p className="text-xs text-muted-foreground">Manage student, staff and faculty access</p>
             </div>
           </CardHeader>
@@ -105,28 +125,28 @@ export default function AccountManagementPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {MOCK_ACCOUNTS.map((account) => (
+              {filteredAccounts.map((account) => (
                 <TableRow key={account.id} className="border-white/5 hover:bg-white/5">
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary font-black">
-                        {account.name.split(' ').map(n => n[0]).join('')}
+                        {account.fullName.split(' ').map((n: string) => n[0]).join('')}
                       </div>
                       <div>
-                        <p className="font-bold text-white leading-tight">{account.name}</p>
+                        <p className="font-bold text-white leading-tight">{account.fullName}</p>
                         <p className="text-xs text-muted-foreground font-mono">{account.idNumber}</p>
-                        <p className="text-[10px] text-muted-foreground">{account.email}</p>
+                        <p className="text-[10px] text-muted-foreground">{account.institutionalEmail}</p>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell className="text-white font-medium">{account.college}</TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="bg-secondary/10 text-secondary border-secondary/30">
-                      {account.type}
+                      {account.role}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {account.status === 'Active' ? (
+                    {account.accountStatus === 'active' ? (
                       <div className="flex items-center gap-1.5 text-green-400 text-xs font-bold uppercase tracking-wider">
                         <ShieldCheck className="h-3 w-3" /> Active
                       </div>
@@ -137,24 +157,15 @@ export default function AccountManagementPage() {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className={account.status === 'Active' ? "text-yellow-500 hover:bg-yellow-500/10" : "text-green-500 hover:bg-green-500/10"}
-                        title={account.status === 'Active' ? "Block User" : "Unblock User"}
-                      >
-                        <Ban className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-destructive hover:bg-destructive/10"
-                        title="Delete User"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => toggleStatus(account.id, account.accountStatus)}
+                      className={account.accountStatus === 'active' ? "text-yellow-500 hover:bg-yellow-500/10" : "text-green-500 hover:bg-green-500/10"}
+                      title={account.accountStatus === 'active' ? "Block User" : "Unblock User"}
+                    >
+                      {account.accountStatus === 'active' ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
