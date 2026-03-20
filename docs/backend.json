@@ -26,7 +26,7 @@
         },
         "role": {
           "type": "string",
-          "description": "The role or type of the user within the university. Possible values: 'Student', 'Faculty', 'Employee'."
+          "description": "The role or type of the user within the university. Possible values: 'Student', 'Faculty', 'Employee', 'Admin'."
         },
         "college": {
           "type": "string",
@@ -90,7 +90,8 @@
   "auth": {
     "providers": [
       "password",
-      "anonymous"
+      "anonymous",
+      "google.com"
     ]
   },
   "firestore": {
