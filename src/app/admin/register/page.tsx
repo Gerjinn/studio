@@ -76,17 +76,18 @@ export default function RegisterPage() {
         accountStatus: 'active',
       });
 
-      // 3. If the selected role is Admin, also add to roles_admin
-      if (formData.role === 'Admin') {
+      // 3. If the role is Admin or Employee, grant dashboard access via roles_admin
+      if (formData.role === 'Admin' || formData.role === 'Employee') {
         await setDoc(doc(db, 'roles_admin', newUser.uid), {
           email: formData.email,
-          assignedAt: new Date().toISOString()
+          assignedAt: new Date().toISOString(),
+          role: formData.role
         });
       }
 
       toast({
         title: "Account Created",
-        description: "User profile has been registered successfully.",
+        description: "User profile and permissions have been initialized successfully.",
       });
       
       router.push('/admin/accounts');

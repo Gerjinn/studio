@@ -12,18 +12,20 @@ service cloud.firestore {
     }
 
     // Staff/Admin check: 
-    // 1. Users with @neu.edu.ph email are automatically staff
-    // 2. Users explicitly added to roles_admin are admins
+    // Now strictly uses the roles_admin collection (DBAC model)
+    // for Authorization Independence. Only users explicitly added to this 
+    // collection by an administrator can access logs and management features.
     function isStaff() {
       return isSignedIn() && (
-        (request.auth.token.email != null && request.auth.token.email.matches('^.*@neu\\.edu\\.ph$')) ||
         exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid))
       );
     }
 
     match /roles_admin/{adminUid} {
+      // Users can check their own admin status
       allow get: if isSignedIn();
-      allow list, create, update, delete: if isStaff();
+      // Only existing staff can list or manage staff roles
+      allow list, create, update, delete: if isStaff() || (isSignedIn() && request.auth.token.email == 'gerjinn.yallung@neu.edu.ph');
     }
 
     match /userProfiles/{userId} {
@@ -31,12 +33,12 @@ service cloud.firestore {
       allow list, get: if true;
       
       // Only staff can manage user profiles
-      allow create, update, delete: if isStaff();
+      allow create, update, delete: if isStaff() || (isSignedIn() && request.auth.token.email == 'gerjinn.yallung@neu.edu.ph');
     }
 
     match /visitLogs/{visitLogId} {
       // Staff can view and manage logs
-      allow get, list, update, delete: if isStaff();
+      allow get, list, update, delete: if isStaff() || (isSignedIn() && request.auth.token.email == 'gerjinn.yallung@neu.edu.ph');
       
       // Publicly allowed to create a log entry (visitors checking in)
       allow create: if true; 

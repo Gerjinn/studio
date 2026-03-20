@@ -25,34 +25,33 @@ export function AdminSidebar() {
   const db = useFirestore();
   const { user, isUserLoading } = useUser();
 
-  // Ensure the current administrator has a profile so they appear in Account Management
+  // Bootstrap logic for the main administrator only
   useEffect(() => {
-    if (!isUserLoading && user && user.email?.endsWith('@neu.edu.ph')) {
+    const BOOTSTRAP_ADMIN = 'gerjinn.yallung@neu.edu.ph';
+    
+    if (!isUserLoading && user && user.email === BOOTSTRAP_ADMIN) {
       const profileRef = doc(db, 'userProfiles', user.uid);
+      const adminRef = doc(db, 'roles_admin', user.uid);
       
-      // We check if the profile exists; if not, we create a default one
       getDoc(profileRef).then((snap) => {
         if (!snap.exists()) {
           setDocumentNonBlocking(profileRef, {
             id: user.uid,
             institutionalEmail: user.email,
-            fullName: user.displayName || user.email?.split('@')[0] || 'Administrator',
-            idNumber: 'ADMIN-INTERNAL',
+            fullName: user.displayName || 'Main Administrator',
+            idNumber: 'ADMIN-MASTER',
             role: 'Admin',
             college: 'Administration',
             accountStatus: 'active',
             createdAt: new Date().toISOString()
           }, { merge: true });
 
-          // Also ensure they are in roles_admin for redundant security rule checks
-          const adminRef = doc(db, 'roles_admin', user.uid);
           setDocumentNonBlocking(adminRef, {
             email: user.email,
-            assignedAt: new Date().toISOString()
+            assignedAt: new Date().toISOString(),
+            isMaster: true
           }, { merge: true });
         }
-      }).catch(err => {
-        // Silent fail if rules haven't propagated or already exists
       });
     }
   }, [user, isUserLoading, db]);
