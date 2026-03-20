@@ -34,8 +34,8 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { format, isToday, isThisWeek, isThisMonth, parseISO } from 'date-fns';
-import { useFirestore, useCollection, useMemoFirebase, useUser, setDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, doc, getDoc } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
@@ -43,39 +43,11 @@ export default function DashboardPage() {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   
-  // Ensure the current admin has a profile in userProfiles
   useEffect(() => {
-    if (!isUserLoading && user && user.email?.endsWith('@neu.edu.ph')) {
-      const checkAndCreateProfile = async () => {
-        const profileRef = doc(db, 'userProfiles', user.uid);
-        const profileSnap = await getDoc(profileRef);
-        
-        if (!profileSnap.exists()) {
-          // Provision a default admin profile so they appear in Account Management
-          setDocumentNonBlocking(profileRef, {
-            id: user.uid,
-            institutionalEmail: user.email,
-            fullName: user.displayName || user.email?.split('@')[0] || 'Administrator',
-            idNumber: 'ADMIN-INTERNAL',
-            role: 'Admin',
-            college: 'Administration',
-            accountStatus: 'active',
-            createdAt: new Date().toISOString()
-          }, { merge: true });
-
-          // Also ensure they are in roles_admin for rule redundancy
-          const adminRef = doc(db, 'roles_admin', user.uid);
-          setDocumentNonBlocking(adminRef, {
-            email: user.email,
-            assignedAt: new Date().toISOString()
-          }, { merge: true });
-        }
-      };
-      checkAndCreateProfile();
-    } else if (!isUserLoading && !user) {
+    if (!isUserLoading && !user) {
       router.push('/admin/login');
     }
-  }, [user, isUserLoading, db, router]);
+  }, [user, isUserLoading, router]);
 
   const visitsQuery = useMemoFirebase(() => {
     if (!user) return null;

@@ -11,31 +11,32 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Admin/Staff check: 
-    // Users with an institutional email are granted administrative access to manage logs and profiles.
-    function isAdmin() {
+    // Staff/Admin check: 
+    // 1. Users with @neu.edu.ph email are automatically staff
+    // 2. Users explicitly added to roles_admin are admins
+    function isStaff() {
       return isSignedIn() && (
-        request.auth.token.email != null && 
-        request.auth.token.email.matches('^.*@neu\\.edu\\.ph$')
+        (request.auth.token.email != null && request.auth.token.email.matches('^.*@neu\\.edu\\.ph$')) ||
+        exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid))
       );
     }
 
     match /roles_admin/{adminUid} {
       allow get: if isSignedIn();
-      allow list, create, update, delete: if isAdmin();
+      allow list, create, update, delete: if isStaff();
     }
 
     match /userProfiles/{userId} {
       // Publicly allowed to list and get to support email verification during library entry
       allow list, get: if true;
       
-      // Only admins/staff can manage user profiles
-      allow create, update, delete: if isAdmin();
+      // Only staff can manage user profiles
+      allow create, update, delete: if isStaff();
     }
 
     match /visitLogs/{visitLogId} {
-      // Only admins and staff can view the complete visitor log and dashboard statistics
-      allow get, list, update, delete: if isAdmin();
+      // Staff can view and manage logs
+      allow get, list, update, delete: if isStaff();
       
       // Publicly allowed to create a log entry (visitors checking in)
       allow create: if true; 

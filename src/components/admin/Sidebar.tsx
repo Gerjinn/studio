@@ -1,6 +1,7 @@
 
 "use client"
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Logo } from '@/components/Logo';
@@ -8,7 +9,8 @@ import { LayoutDashboard, ClipboardList, Users, LogOut, ChevronRight } from 'luc
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore, setDocumentNonBlocking } from '@/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
@@ -20,7 +22,40 @@ export function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const auth = useAuth();
-  const { user } = useUser();
+  const db = useFirestore();
+  const { user, isUserLoading } = useUser();
+
+  // Ensure the current administrator has a profile so they appear in Account Management
+  useEffect(() => {
+    if (!isUserLoading && user && user.email?.endsWith('@neu.edu.ph')) {
+      const profileRef = doc(db, 'userProfiles', user.uid);
+      
+      // We check if the profile exists; if not, we create a default one
+      getDoc(profileRef).then((snap) => {
+        if (!snap.exists()) {
+          setDocumentNonBlocking(profileRef, {
+            id: user.uid,
+            institutionalEmail: user.email,
+            fullName: user.displayName || user.email?.split('@')[0] || 'Administrator',
+            idNumber: 'ADMIN-INTERNAL',
+            role: 'Admin',
+            college: 'Administration',
+            accountStatus: 'active',
+            createdAt: new Date().toISOString()
+          }, { merge: true });
+
+          // Also ensure they are in roles_admin for redundant security rule checks
+          const adminRef = doc(db, 'roles_admin', user.uid);
+          setDocumentNonBlocking(adminRef, {
+            email: user.email,
+            assignedAt: new Date().toISOString()
+          }, { merge: true });
+        }
+      }).catch(err => {
+        // Silent fail if rules haven't propagated or already exists
+      });
+    }
+  }, [user, isUserLoading, db]);
 
   const handleLogout = async () => {
     await auth.signOut();
