@@ -17,7 +17,8 @@ import {
   Settings,
   Save,
   Trash2,
-  Filter
+  Filter,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   Table, 
@@ -40,7 +41,8 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogFooter
+  DialogFooter,
+  DialogDescription
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -55,6 +57,7 @@ export default function AccountManagementPage() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [collegeFilter, setCollegeFilter] = useState('all');
   const [editingUser, setEditingUser] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const db = useFirestore();
   const { user: currentUser, isUserLoading } = useUser();
@@ -163,23 +166,25 @@ export default function AccountManagementPage() {
       return;
     }
 
-    if (confirm('Are you sure you want to delete this user profile? This will remove all their access and permissions.')) {
+    const confirmMessage = "WARNING: This action is permanent. The user profile and all associated administrative permissions will be FOREVER DELETED. This cannot be undone.\n\nType 'DELETE' in your mind and click OK to proceed.";
+    
+    if (window.confirm(confirmMessage)) {
+      setIsDeleting(true);
       const userRef = doc(db, 'userProfiles', userId);
       const adminRef = doc(db, 'roles_admin', userId);
       
-      // Trigger deletions using the provided helper
+      // Trigger deletions
       deleteDocumentNonBlocking(userRef);
       deleteDocumentNonBlocking(adminRef);
       
       toast({
         variant: "destructive",
         title: "Account Deleted",
-        description: "The user profile and associated permissions have been removed.",
+        description: "The user profile has been permanently removed from the system.",
       });
       
-      if (editingUser?.id === userId) {
-        setEditingUser(null);
-      }
+      setEditingUser(null);
+      setTimeout(() => setIsDeleting(false), 1000);
     }
   };
 
@@ -347,10 +352,13 @@ export default function AccountManagementPage() {
           </Table>
         </Card>
 
-        <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
+        <Dialog open={!!editingUser} onOpenChange={(open) => !open && !isDeleting && setEditingUser(null)}>
           <DialogContent className="bg-card border-white/10 text-white sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold font-headline">Account Settings</DialogTitle>
+              <DialogDescription className="text-white/60">
+                Update user information or manage permissions.
+              </DialogDescription>
             </DialogHeader>
             {editingUser && (
               <form onSubmit={handleUpdateUser} className="space-y-6 py-4">
@@ -419,26 +427,36 @@ export default function AccountManagementPage() {
                   />
                 </div>
 
-                <DialogFooter className="flex flex-col sm:flex-row gap-2">
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    onClick={() => handleDeleteUser(editingUser.id)}
-                    disabled={editingUser.id === currentUser?.uid}
-                    className="text-destructive hover:bg-destructive/10 order-last sm:order-first"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete Account
-                  </Button>
-                  <div className="flex gap-2 flex-1 justify-end">
-                    <Button type="button" variant="ghost" onClick={() => setEditingUser(null)}>
-                      Cancel
-                    </Button>
-                    <Button type="submit" className="gap-2">
-                      <Save className="h-4 w-4" />
-                      Save
+                <div className="pt-4 border-t border-white/10">
+                  <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 space-y-3">
+                    <div className="flex items-center gap-2 text-destructive font-bold">
+                      <AlertTriangle className="h-4 w-4" />
+                      <span>Danger Zone</span>
+                    </div>
+                    <p className="text-xs text-destructive-foreground/80">
+                      Deleting this account will permanently remove the user's profile and all administrative access. This action cannot be undone.
+                    </p>
+                    <Button 
+                      type="button" 
+                      variant="destructive" 
+                      onClick={() => handleDeleteUser(editingUser.id)}
+                      disabled={editingUser.id === currentUser?.uid || isDeleting}
+                      className="w-full gap-2"
+                    >
+                      {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      Delete This Account Forever
                     </Button>
                   </div>
+                </div>
+
+                <DialogFooter className="flex flex-col sm:flex-row gap-2">
+                  <Button type="button" variant="ghost" onClick={() => setEditingUser(null)} className="flex-1">
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="flex-1 gap-2">
+                    <Save className="h-4 w-4" />
+                    Save Changes
+                  </Button>
                 </DialogFooter>
               </form>
             )}
