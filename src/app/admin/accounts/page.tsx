@@ -55,8 +55,9 @@ export default function AccountManagementPage() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [collegeFilter, setCollegeFilter] = useState('all');
   const [editingUser, setEditingUser] = useState<any>(null);
+  
   const db = useFirestore();
-  const { user: currentUser } = useUser();
+  const { user: currentUser, isUserLoading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -151,7 +152,9 @@ export default function AccountManagementPage() {
   };
 
   const handleDeleteUser = (userId: string) => {
-    if (userId === currentUser?.uid) {
+    if (!currentUser) return;
+
+    if (userId === currentUser.uid) {
       toast({
         variant: "destructive",
         title: "Action Denied",
@@ -160,11 +163,11 @@ export default function AccountManagementPage() {
       return;
     }
 
-    if (confirm('Are you sure you want to delete this user profile? This will remove all their access and visit history connections.')) {
+    if (confirm('Are you sure you want to delete this user profile? This will remove all their access and permissions.')) {
       const userRef = doc(db, 'userProfiles', userId);
       const adminRef = doc(db, 'roles_admin', userId);
       
-      // Trigger deletions
+      // Trigger deletions using the provided helper
       deleteDocumentNonBlocking(userRef);
       deleteDocumentNonBlocking(adminRef);
       
@@ -173,11 +176,14 @@ export default function AccountManagementPage() {
         title: "Account Deleted",
         description: "The user profile and associated permissions have been removed.",
       });
-      setEditingUser(null);
+      
+      if (editingUser?.id === userId) {
+        setEditingUser(null);
+      }
     }
   };
 
-  if (isAccountsLoading || isAdminsLoading) {
+  if (isAccountsLoading || isAdminsLoading || isUserLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#1a2c38]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -274,6 +280,7 @@ export default function AccountManagementPage() {
             <TableBody>
               {filteredAccounts.map((account) => {
                 const hasStaffAccess = adminUids.has(account.id);
+                const isSelf = account.id === currentUser?.uid;
                 return (
                   <TableRow key={account.id} className="border-white/5 hover:bg-white/5">
                     <TableCell>
@@ -317,6 +324,7 @@ export default function AccountManagementPage() {
                           variant="ghost" 
                           size="sm" 
                           onClick={() => toggleStatus(account.id, account.accountStatus)}
+                          disabled={isSelf}
                           className={account.accountStatus === 'active' ? "text-yellow-500 hover:bg-yellow-500/10" : "text-green-500 hover:bg-green-500/10"}
                         >
                           {account.accountStatus === 'active' ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
@@ -325,7 +333,7 @@ export default function AccountManagementPage() {
                           variant="ghost" 
                           size="sm" 
                           onClick={() => handleDeleteUser(account.id)}
-                          disabled={account.id === currentUser?.uid}
+                          disabled={isSelf}
                           className="text-destructive hover:bg-destructive/10"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -339,7 +347,6 @@ export default function AccountManagementPage() {
           </Table>
         </Card>
 
-        {/* Edit User Dialog */}
         <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
           <DialogContent className="bg-card border-white/10 text-white sm:max-w-[500px]">
             <DialogHeader>
