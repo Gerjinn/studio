@@ -1,11 +1,10 @@
-
 {
   "placeholderImages": [
     {
       "id": "neu-logo",
-      "description": "New Era University official-style seal logo",
-      "imageUrl": "https://picsum.photos/seed/neu-seal/200/200",
-      "imageHint": "university seal"
+      "description": "New Era University official seal logo",
+      "imageUrl": "https://upload.wikimedia.org/wikipedia/en/c/c6/New_Era_University.svg",
+      "imageHint": "university logo"
     },
     {
       "id": "library-hero",
