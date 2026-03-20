@@ -35,8 +35,8 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { format, isToday, isThisWeek, isThisMonth, parseISO } from 'date-fns';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, orderBy, doc, setDoc } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, useUser, setDocumentNonBlocking } from '@/firebase';
+import { collection, query, orderBy, doc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
@@ -53,7 +53,7 @@ export default function DashboardPage() {
     
     if (user && user.email?.endsWith('@neu.edu.ph')) {
       const adminRef = doc(db, 'roles_admin', user.uid);
-      setDoc(adminRef, {
+      setDocumentNonBlocking(adminRef, {
         email: user.email,
         lastLogin: new Date().toISOString()
       }, { merge: true });
@@ -65,7 +65,7 @@ export default function DashboardPage() {
     return query(collection(db, 'visitLogs'), orderBy('entryTime', 'desc'));
   }, [db, user]);
 
-  const { data: visits, isLoading: isLogsLoading } = useCollection(visitsQuery);
+  const { data: visits, isLoading: isLogsLoading, error: logsError } = useCollection(visitsQuery);
 
   // Derived statistics
   const stats = useMemo(() => {
@@ -145,6 +145,12 @@ export default function DashboardPage() {
             </Button>
           </div>
         </header>
+
+        {logsError && (
+          <div className="mb-8 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm font-bold">
+            Notice: Your administrative permissions are still being verified. Live data may be limited.
+          </div>
+        )}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -276,7 +282,13 @@ export default function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentVisits.map((v) => (
+                {recentVisits.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-12 text-muted-foreground italic">
+                      No visit records found yet.
+                    </TableCell>
+                  </TableRow>
+                ) : recentVisits.map((v) => (
                   <TableRow key={v.id} className="border-white/5 hover:bg-white/5">
                     <TableCell className="font-medium text-white">{v.visitorFullName}</TableCell>
                     <TableCell className="text-muted-foreground">{v.visitorIdNumber}</TableCell>

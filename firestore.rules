@@ -15,11 +15,13 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Grant admin privileges if a role document exists OR if the user has a verified NEU email
+    // A robust check for admin status: 
+    // 1. Explicitly defined in the roles_admin collection
+    // 2. OR possesses a valid institutional email domain
     function isAdmin() {
       return isSignedIn() && (
         exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) ||
-        request.auth.token.email.matches('.*@neu\\.edu\\.ph$')
+        (request.auth.token.email != null && request.auth.token.email.matches('^.*@neu\\.edu\\.ph$'))
       );
     }
 
@@ -27,7 +29,7 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if isAdmin();
       // Allow self-registration as admin for users with institutional emails
-      allow create: if isSignedIn() && request.auth.uid == adminUid && request.auth.token.email.matches('.*@neu\\.edu\\.ph$');
+      allow create: if isSignedIn() && request.auth.uid == adminUid && request.auth.token.email.matches('^.*@neu\\.edu\\.ph$');
       allow update: if isAdmin() && request.auth.uid == adminUid;
       allow delete: if false;
     }
@@ -44,9 +46,10 @@ service cloud.firestore {
     }
 
     match /visitLogs/{visitLogId} {
+      // Allow listing and reading if the user is an admin
       allow get, list: if isAdmin();
       
-      // Allow creation for demonstration/prototype purposes
+      // Allow creation for visitors
       allow create: if true; 
       
       allow update, delete: if isAdmin();
