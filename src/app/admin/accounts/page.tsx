@@ -16,7 +16,8 @@ import {
   CheckCircle,
   Settings,
   Save,
-  Trash2
+  Trash2,
+  Filter
 } from 'lucide-react';
 import { 
   Table, 
@@ -51,6 +52,8 @@ import { COLLEGES } from '@/lib/mock-data';
 
 export default function AccountManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [collegeFilter, setCollegeFilter] = useState('all');
   const [editingUser, setEditingUser] = useState<any>(null);
   const db = useFirestore();
   const router = useRouter();
@@ -74,13 +77,18 @@ export default function AccountManagementPage() {
 
   const filteredAccounts = useMemo(() => {
     if (!accounts) return [];
-    return accounts.filter(acc => 
-      acc.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      acc.idNumber.includes(searchTerm) ||
-      acc.college?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      acc.institutionalEmail.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [accounts, searchTerm]);
+    return accounts.filter(acc => {
+      const matchesSearch = 
+        acc.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        acc.idNumber.includes(searchTerm) ||
+        acc.institutionalEmail.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesRole = roleFilter === 'all' || acc.role === roleFilter;
+      const matchesCollege = collegeFilter === 'all' || acc.college === collegeFilter;
+      
+      return matchesSearch && matchesRole && matchesCollege;
+    });
+  }, [accounts, searchTerm, roleFilter, collegeFilter]);
 
   const toggleStatus = (userId: string, currentStatus: string) => {
     const userRef = doc(db, 'userProfiles', userId);
@@ -122,7 +130,7 @@ export default function AccountManagementPage() {
     
     updateDocumentNonBlocking(userRef, updateData);
     
-    // Also sync admin role if changed
+    // Sync admin role based on the role selection or explicit toggle
     const currentIsAdmin = adminUids.has(id);
     const shouldBeAdmin = editingUser.role === 'Admin';
     if (shouldBeAdmin !== currentIsAdmin) {
@@ -176,15 +184,58 @@ export default function AccountManagementPage() {
           </Button>
         </header>
 
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
-          <div className="relative flex-1">
+        <div className="flex flex-col gap-4 mb-6">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
-              placeholder="Search by name, ID, email or college..." 
+              placeholder="Search by name, ID, or email..." 
               className="pl-9 bg-card border-white/10"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+          </div>
+          <div className="flex flex-wrap gap-4 items-center">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground font-medium">Filters:</span>
+            </div>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-[180px] bg-card border-white/10 text-white">
+                <SelectValue placeholder="All Roles" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="Student">Student</SelectItem>
+                <SelectItem value="Faculty">Faculty</SelectItem>
+                <SelectItem value="Employee">Employee</SelectItem>
+                <SelectItem value="Admin">Admin</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={collegeFilter} onValueChange={setCollegeFilter}>
+              <SelectTrigger className="w-[220px] bg-card border-white/10 text-white">
+                <SelectValue placeholder="All Colleges" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Colleges</SelectItem>
+                {COLLEGES.map(college => (
+                  <SelectItem key={college} value={college}>{college}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {(roleFilter !== 'all' || collegeFilter !== 'all' || searchTerm !== '') && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  setRoleFilter('all');
+                  setCollegeFilter('all');
+                  setSearchTerm('');
+                }}
+                className="text-primary hover:text-primary hover:bg-primary/10"
+              >
+                Clear Filters
+              </Button>
+            )}
           </div>
         </div>
 

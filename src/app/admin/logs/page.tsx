@@ -14,7 +14,8 @@ import {
   School,
   Activity,
   Loader2,
-  Trash2
+  Trash2,
+  Filter
 } from 'lucide-react';
 import { 
   Table, 
@@ -36,10 +37,12 @@ import {
 import { useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, orderBy, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { COLLEGES } from '@/lib/mock-data';
 
 export default function VisitorLogPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [collegeFilter, setCollegeFilter] = useState('all');
   const db = useFirestore();
   const { toast } = useToast();
 
@@ -58,10 +61,11 @@ export default function VisitorLogPage() {
         v.visitorEmail?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesRole = roleFilter === 'all' || v.visitorRole === roleFilter;
+      const matchesCollege = collegeFilter === 'all' || v.visitorCollege === collegeFilter;
       
-      return matchesSearch && matchesRole;
+      return matchesSearch && matchesRole && matchesCollege;
     });
-  }, [visits, searchTerm, roleFilter]);
+  }, [visits, searchTerm, roleFilter, collegeFilter]);
 
   const handleDeleteLog = (logId: string) => {
     if (confirm('Are you sure you want to delete this visit log?')) {
@@ -99,8 +103,8 @@ export default function VisitorLogPage() {
 
         <Card className="bg-card/30 border-white/5 mb-8">
           <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="relative col-span-3">
+            <div className="flex flex-col gap-4">
+              <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
                   placeholder="Search Name, ID, or Email..." 
@@ -109,17 +113,49 @@ export default function VisitorLogPage() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger className="bg-card border-white/10 text-white">
-                  <SelectValue placeholder="All Roles" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="Student">Students</SelectItem>
-                  <SelectItem value="Faculty">Faculty</SelectItem>
-                  <SelectItem value="Employee">Employee</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex flex-wrap gap-4 items-center">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground font-medium">Filters:</span>
+                </div>
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger className="w-[180px] bg-card border-white/10 text-white">
+                    <SelectValue placeholder="All Roles" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Roles</SelectItem>
+                    <SelectItem value="Student">Students</SelectItem>
+                    <SelectItem value="Faculty">Faculty</SelectItem>
+                    <SelectItem value="Employee">Employee</SelectItem>
+                    <SelectItem value="Admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={collegeFilter} onValueChange={setCollegeFilter}>
+                  <SelectTrigger className="w-[220px] bg-card border-white/10 text-white">
+                    <SelectValue placeholder="All Colleges" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Colleges</SelectItem>
+                    {COLLEGES.map(college => (
+                      <SelectItem key={college} value={college}>{college}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {(roleFilter !== 'all' || collegeFilter !== 'all' || searchTerm !== '') && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => {
+                      setRoleFilter('all');
+                      setCollegeFilter('all');
+                      setSearchTerm('');
+                    }}
+                    className="text-primary hover:text-primary hover:bg-primary/10"
+                  >
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
