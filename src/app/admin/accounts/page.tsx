@@ -18,7 +18,8 @@ import {
   Save,
   Trash2,
   Filter,
-  AlertTriangle
+  AlertTriangle,
+  X
 } from 'lucide-react';
 import { 
   Table, 
@@ -44,6 +45,16 @@ import {
   DialogFooter,
   DialogDescription
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from '@/firebase';
@@ -57,6 +68,7 @@ export default function AccountManagementPage() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [collegeFilter, setCollegeFilter] = useState('all');
   const [editingUser, setEditingUser] = useState<any>(null);
+  const [userToDelete, setUserToDelete] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   
   const db = useFirestore();
@@ -139,7 +151,7 @@ export default function AccountManagementPage() {
     
     updateDocumentNonBlocking(userRef, updateData);
     
-    // Sync admin/staff access: Admins and Employees should be in roles_admin
+    // Sync staff access: Admins and Employees should be in roles_admin
     const currentHasStaffAccess = adminUids.has(id);
     const shouldHaveStaffAccess = editingUser.role === 'Admin' || editingUser.role === 'Employee';
     
@@ -154,38 +166,36 @@ export default function AccountManagementPage() {
     setEditingUser(null);
   };
 
-  const handleDeleteUser = (userId: string) => {
-    if (!currentUser) return;
+  const confirmDelete = () => {
+    if (!userToDelete || !currentUser) return;
 
-    if (userId === currentUser.uid) {
+    if (userToDelete.id === currentUser.uid) {
       toast({
         variant: "destructive",
         title: "Action Denied",
         description: "You cannot delete your own administrative account.",
       });
+      setUserToDelete(null);
       return;
     }
 
-    const confirmMessage = "WARNING: This action is permanent. The user profile and all associated administrative permissions will be FOREVER DELETED. This cannot be undone.\n\nType 'DELETE' in your mind and click OK to proceed.";
+    setIsDeleting(true);
+    const userRef = doc(db, 'userProfiles', userToDelete.id);
+    const adminRef = doc(db, 'roles_admin', userToDelete.id);
     
-    if (window.confirm(confirmMessage)) {
-      setIsDeleting(true);
-      const userRef = doc(db, 'userProfiles', userId);
-      const adminRef = doc(db, 'roles_admin', userId);
-      
-      // Trigger deletions
-      deleteDocumentNonBlocking(userRef);
-      deleteDocumentNonBlocking(adminRef);
-      
-      toast({
-        variant: "destructive",
-        title: "Account Deleted",
-        description: "The user profile has been permanently removed from the system.",
-      });
-      
-      setEditingUser(null);
-      setTimeout(() => setIsDeleting(false), 1000);
-    }
+    // Trigger permanent deletions
+    deleteDocumentNonBlocking(userRef);
+    deleteDocumentNonBlocking(adminRef);
+    
+    toast({
+      variant: "destructive",
+      title: "Account Permanently Deleted",
+      description: "The user profile and all permissions have been removed.",
+    });
+    
+    setEditingUser(null);
+    setUserToDelete(null);
+    setTimeout(() => setIsDeleting(false), 500);
   };
 
   if (isAccountsLoading || isAdminsLoading || isUserLoading) {
@@ -337,7 +347,7 @@ export default function AccountManagementPage() {
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          onClick={() => handleDeleteUser(account.id)}
+                          onClick={() => setUserToDelete(account)}
                           disabled={isSelf}
                           className="text-destructive hover:bg-destructive/10"
                         >
@@ -352,6 +362,7 @@ export default function AccountManagementPage() {
           </Table>
         </Card>
 
+        {/* Edit User Dialog */}
         <Dialog open={!!editingUser} onOpenChange={(open) => !open && !isDeleting && setEditingUser(null)}>
           <DialogContent className="bg-card border-white/10 text-white sm:max-w-[500px]">
             <DialogHeader>
@@ -433,18 +444,18 @@ export default function AccountManagementPage() {
                       <AlertTriangle className="h-4 w-4" />
                       <span>Danger Zone</span>
                     </div>
-                    <p className="text-xs text-destructive-foreground/80">
-                      Deleting this account will permanently remove the user's profile and all administrative access. This action cannot be undone.
+                    <p className="text-xs text-destructive-foreground/80 leading-relaxed">
+                      Deleting this account will permanently remove the user's profile and all administrative access.
                     </p>
                     <Button 
                       type="button" 
                       variant="destructive" 
-                      onClick={() => handleDeleteUser(editingUser.id)}
+                      onClick={() => setUserToDelete(editingUser)}
                       disabled={editingUser.id === currentUser?.uid || isDeleting}
-                      className="w-full gap-2"
+                      className="w-full gap-2 font-bold"
                     >
-                      {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                      Delete This Account Forever
+                      <Trash2 className="h-4 w-4" />
+                      Permanently Delete Account
                     </Button>
                   </div>
                 </div>
@@ -462,6 +473,34 @@ export default function AccountManagementPage() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Alert */}
+        <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && !isDeleting && setUserToDelete(null)}>
+          <AlertDialogContent className="bg-card border-white/10 text-white">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-xl font-bold flex items-center gap-2">
+                <AlertTriangle className="h-6 w-6 text-destructive" />
+                Permanent Deletion
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-white/70 text-base">
+                Are you absolutely sure you want to delete <span className="font-bold text-white">{userToDelete?.fullName}</span>? 
+                This action is <span className="text-destructive font-black underline">PERMANENT</span> and will remove all profile data and administrative privileges forever.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2">
+              <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={confirmDelete}
+                className="bg-destructive text-white hover:bg-destructive/90 font-bold"
+              >
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Yes, Delete Forever"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
       </main>
     </div>
   );
