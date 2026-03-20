@@ -35,12 +35,11 @@ service cloud.firestore {
     }
 
     match /userProfiles/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin();
+      // Allow get and list for anyone to support searching for institutional emails during library entry
+      allow get, list: if true;
       
-      allow create: if isOwner(userId) || isAdmin();
-      
-      allow update: if isOwner(userId) || isAdmin();
+      // Allow creation/updates only by the owner or an admin
+      allow create, update: if isOwner(userId) || isAdmin();
       
       allow delete: if isAdmin();
     }
@@ -49,7 +48,7 @@ service cloud.firestore {
       // Allow listing and reading if the user is an admin
       allow get, list: if isAdmin();
       
-      // Allow creation for visitors
+      // Allow creation for visitors (students/employees logging their visit)
       allow create: if true; 
       
       allow update, delete: if isAdmin();
