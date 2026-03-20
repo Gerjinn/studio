@@ -76,6 +76,14 @@ export default function RegisterPage() {
         accountStatus: 'active',
       });
 
+      // 3. If the selected role is Admin, also add to roles_admin
+      if (formData.role === 'Admin') {
+        await setDoc(doc(db, 'roles_admin', newUser.uid), {
+          email: formData.email,
+          assignedAt: new Date().toISOString()
+        });
+      }
+
       toast({
         title: "Account Created",
         description: "User profile has been registered successfully.",
@@ -173,6 +181,7 @@ export default function RegisterPage() {
                     <SelectItem value="Student">Student</SelectItem>
                     <SelectItem value="Faculty">Faculty</SelectItem>
                     <SelectItem value="Employee">Employee</SelectItem>
+                    <SelectItem value="Admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

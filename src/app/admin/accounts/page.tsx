@@ -122,6 +122,13 @@ export default function AccountManagementPage() {
     
     updateDocumentNonBlocking(userRef, updateData);
     
+    // Also sync admin role if changed
+    const currentIsAdmin = adminUids.has(id);
+    const shouldBeAdmin = editingUser.role === 'Admin';
+    if (shouldBeAdmin !== currentIsAdmin) {
+      handleToggleAdmin(id, editingUser.institutionalEmail, currentIsAdmin);
+    }
+    
     toast({
       title: "Profile Updated",
       description: `${editingUser.fullName}'s profile has been saved.`,
@@ -161,7 +168,7 @@ export default function AccountManagementPage() {
         <header className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold font-headline text-white">Account Management</h1>
-            <p className="text-muted-foreground">Manage user permissions, account status, and admin roles.</p>
+            <p className="text-muted-foreground">Manage user permissions, account status, and roles.</p>
           </div>
           <Button onClick={() => router.push('/admin/register')} className="gap-2 shadow-lg shadow-primary/20">
             <UserPlus className="h-4 w-4" />
@@ -193,14 +200,13 @@ export default function AccountManagementPage() {
                 <TableHead className="text-white font-bold py-5">User Info <ArrowUpDown className="ml-2 h-3 w-3 inline" /></TableHead>
                 <TableHead className="text-white font-bold">College</TableHead>
                 <TableHead className="text-white font-bold">Role</TableHead>
-                <TableHead className="text-white font-bold">Admin</TableHead>
                 <TableHead className="text-white font-bold">Status</TableHead>
                 <TableHead className="text-white font-bold text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredAccounts.map((account) => {
-                const isAdmin = adminUids.has(account.id);
+                const isAdmin = adminUids.has(account.id) || account.role === 'Admin';
                 return (
                   <TableRow key={account.id} className="border-white/5 hover:bg-white/5">
                     <TableCell>
@@ -209,7 +215,10 @@ export default function AccountManagementPage() {
                           {account.fullName.charAt(0)}
                         </div>
                         <div>
-                          <p className="font-bold text-white leading-tight">{account.fullName}</p>
+                          <p className="font-bold text-white leading-tight">
+                            {account.fullName} 
+                            {isAdmin && <ShieldCheck className="inline h-3 w-3 ml-1 text-primary" />}
+                          </p>
                           <p className="text-xs text-muted-foreground font-mono">{account.idNumber}</p>
                         </div>
                       </div>
@@ -219,13 +228,6 @@ export default function AccountManagementPage() {
                       <Badge variant="secondary" className="bg-secondary/10 text-secondary border-secondary/30">
                         {account.role}
                       </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {isAdmin ? (
-                        <ShieldCheck className="h-5 w-5 text-primary" />
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
                     </TableCell>
                     <TableCell>
                       {account.accountStatus === 'active' ? (
@@ -299,6 +301,7 @@ export default function AccountManagementPage() {
                         <SelectItem value="Student">Student</SelectItem>
                         <SelectItem value="Faculty">Faculty</SelectItem>
                         <SelectItem value="Employee">Employee</SelectItem>
+                        <SelectItem value="Admin">Admin</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -325,10 +328,10 @@ export default function AccountManagementPage() {
                 <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5">
                   <div className="space-y-0.5">
                     <Label className="text-base font-bold">Administrator Privileges</Label>
-                    <p className="text-xs text-muted-foreground">Grant full access to dashboard and logs</p>
+                    <p className="text-xs text-muted-foreground">Grant access to dashboard and logs</p>
                   </div>
                   <Switch 
-                    checked={adminUids.has(editingUser.id)} 
+                    checked={adminUids.has(editingUser.id) || editingUser.role === 'Admin'} 
                     onCheckedChange={(checked) => handleToggleAdmin(editingUser.id, editingUser.institutionalEmail, !checked)}
                   />
                 </div>
