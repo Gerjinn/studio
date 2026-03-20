@@ -9,13 +9,12 @@ import { Button } from '@/components/ui/button';
 import { 
   Search, 
   Download, 
-  ChevronLeft,
-  ChevronRight,
   School,
   Activity,
   Loader2,
   Trash2,
-  Filter
+  Filter,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   Table, 
@@ -34,6 +33,16 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, orderBy, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -44,6 +53,9 @@ export default function VisitorLogPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [collegeFilter, setCollegeFilter] = useState('all');
+  const [logToDelete, setLogToDelete] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
   const db = useFirestore();
   const { toast } = useToast();
 
@@ -68,15 +80,21 @@ export default function VisitorLogPage() {
     });
   }, [visits, searchTerm, roleFilter, collegeFilter]);
 
-  const handleDeleteLog = (logId: string) => {
-    if (confirm('Are you sure you want to delete this visit log?')) {
-      const logRef = doc(db, 'visitLogs', logId);
-      deleteDocumentNonBlocking(logRef);
-      toast({
-        title: "Log Deleted",
-        description: "The visit record has been permanently removed.",
-      });
-    }
+  const confirmDeleteLog = () => {
+    if (!logToDelete) return;
+    
+    setIsDeleting(true);
+    const logRef = doc(db, 'visitLogs', logToDelete.id);
+    deleteDocumentNonBlocking(logRef);
+    
+    toast({
+      variant: "destructive",
+      title: "Log Deleted",
+      description: "The visit record has been permanently removed.",
+    });
+    
+    setLogToDelete(null);
+    setTimeout(() => setIsDeleting(false), 500);
   };
 
   const handleExport = () => {
@@ -244,7 +262,7 @@ export default function VisitorLogPage() {
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      onClick={() => handleDeleteLog(v.id)}
+                      onClick={() => setLogToDelete(v)}
                       className="text-destructive hover:bg-destructive/10"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -255,6 +273,33 @@ export default function VisitorLogPage() {
             </TableBody>
           </Table>
         </Card>
+
+        {/* Delete Confirmation Alert */}
+        <AlertDialog open={!!logToDelete} onOpenChange={(open) => !open && !isDeleting && setLogToDelete(null)}>
+          <AlertDialogContent className="bg-card border-white/10 text-white">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-xl font-bold flex items-center gap-2">
+                <AlertTriangle className="h-6 w-6 text-destructive" />
+                Permanent Deletion
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-white/70 text-base">
+                Are you sure you want to delete the visit record for <span className="font-bold text-white">{logToDelete?.visitorFullName}</span>? 
+                This entry will be <span className="text-destructive font-black underline">PERMANENTLY</span> removed from the historical log.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2">
+              <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={confirmDeleteLog}
+                className="bg-destructive text-white hover:bg-destructive/90 font-bold"
+              >
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete Record"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );

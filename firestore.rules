@@ -13,11 +13,11 @@ service cloud.firestore {
 
     // Staff/Admin check: 
     // Uses the roles_admin collection (DBAC model) for Authorization Independence.
-    // Also allows the master bootstrap account via direct email check.
+    // Also allows the master bootstrap account via direct email check (case-insensitive).
     function isStaff() {
       return isSignedIn() && (
         exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) ||
-        request.auth.token.email == 'gerjinn.yallung@neu.edu.ph'
+        request.auth.token.email.lower() == 'gerjinn.yallung@neu.edu.ph'
       );
     }
 
