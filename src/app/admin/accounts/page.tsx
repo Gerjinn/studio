@@ -15,7 +15,9 @@ import {
   Loader2,
   CheckCircle,
   Settings,
-  Save
+  Save,
+  ShieldAlert,
+  ShieldMinus
 } from 'lucide-react';
 import { 
   Table, 
@@ -41,7 +43,7 @@ import {
   DialogFooter
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, doc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -57,14 +59,25 @@ export default function AccountManagementPage() {
     return query(collection(db, 'userProfiles'));
   }, [db]);
 
-  const { data: accounts, isLoading } = useCollection(accountsQuery);
+  const adminsQuery = useMemoFirebase(() => {
+    return query(collection(db, 'roles_admin'));
+  }, [db]);
+
+  const { data: accounts, isLoading: isAccountsLoading } = useCollection(accountsQuery);
+  const { data: admins, isLoading: isAdminsLoading } = useCollection(adminsQuery);
+
+  const adminUids = useMemo(() => {
+    if (!admins) return new Set<string>();
+    return new Set(admins.map(a => a.id));
+  }, [admins]);
 
   const filteredAccounts = useMemo(() => {
     if (!accounts) return [];
     return accounts.filter(acc => 
       acc.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       acc.idNumber.includes(searchTerm) ||
-      acc.college.toLowerCase().includes(searchTerm.toLowerCase())
+      acc.college.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      acc.institutionalEmail.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [accounts, searchTerm]);
 
@@ -76,6 +89,28 @@ export default function AccountManagementPage() {
       title: "Status Updated",
       description: `User account is now ${newStatus}.`,
     });
+  };
+
+  const toggleAdminPrivilege = (userId: string, email: string) => {
+    const isAdmin = adminUids.has(userId);
+    const adminRef = doc(db, 'roles_admin', userId);
+
+    if (isAdmin) {
+      deleteDocumentNonBlocking(adminRef);
+      toast({
+        title: "Privileges Revoked",
+        description: "User is no longer an administrator.",
+      });
+    } else {
+      setDocumentNonBlocking(adminRef, {
+        email,
+        assignedAt: new Date().toISOString()
+      }, { merge: true });
+      toast({
+        title: "Privileges Granted",
+        description: "User has been promoted to administrator.",
+      });
+    }
   };
 
   const handleUpdateUser = (e: React.FormEvent) => {
@@ -94,7 +129,7 @@ export default function AccountManagementPage() {
     setEditingUser(null);
   };
 
-  if (isLoading) {
+  if (isAccountsLoading || isAdminsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#1a2c38]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -109,11 +144,11 @@ export default function AccountManagementPage() {
         <header className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold font-headline text-white">Account Management</h1>
-            <p className="text-muted-foreground">Manage user permissions and account status.</p>
+            <p className="text-muted-foreground">Manage user permissions, account status, and admin roles.</p>
           </div>
           <Button onClick={() => router.push('/admin/register')} className="gap-2 shadow-lg shadow-primary/20">
             <UserPlus className="h-4 w-4" />
-            Register Account
+            Add New User
           </Button>
         </header>
 
@@ -122,22 +157,12 @@ export default function AccountManagementPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
-              placeholder="Search by name, ID, or college..." 
+              placeholder="Search by name, ID, email or college..." 
               className="pl-9 bg-card border-white/10"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Select>
-            <SelectTrigger className="w-[180px] bg-card border-white/10 text-white">
-              <SelectValue placeholder="All Roles" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Student">Student</SelectItem>
-              <SelectItem value="Faculty">Faculty</SelectItem>
-              <SelectItem value="Employee">Employee</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         <Card className="bg-card/30 border-white/5">
@@ -151,68 +176,90 @@ export default function AccountManagementPage() {
             <TableHeader className="bg-white/2">
               <TableRow className="border-white/5">
                 <TableHead className="text-white font-bold py-5">User Info <ArrowUpDown className="ml-2 h-3 w-3 inline" /></TableHead>
-                <TableHead className="text-white font-bold">College <ArrowUpDown className="ml-2 h-3 w-3 inline" /></TableHead>
-                <TableHead className="text-white font-bold">Type</TableHead>
+                <TableHead className="text-white font-bold">College</TableHead>
+                <TableHead className="text-white font-bold">Role</TableHead>
+                <TableHead className="text-white font-bold">Admin Status</TableHead>
                 <TableHead className="text-white font-bold">Status</TableHead>
                 <TableHead className="text-white font-bold text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAccounts.map((account) => (
-                <TableRow key={account.id} className="border-white/5 hover:bg-white/5">
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary font-black">
-                        {account.fullName.split(' ').map((n: string) => n[0]).join('')}
+              {filteredAccounts.map((account) => {
+                const isAdmin = adminUids.has(account.id);
+                return (
+                  <TableRow key={account.id} className="border-white/5 hover:bg-white/5">
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary font-black">
+                          {account.fullName.split(' ').map((n: string) => n[0]).join('')}
+                        </div>
+                        <div>
+                          <p className="font-bold text-white leading-tight">{account.fullName}</p>
+                          <p className="text-xs text-muted-foreground font-mono">{account.idNumber}</p>
+                          <p className="text-[10px] text-muted-foreground">{account.institutionalEmail}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold text-white leading-tight">{account.fullName}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{account.idNumber}</p>
-                        <p className="text-[10px] text-muted-foreground">{account.institutionalEmail}</p>
+                    </TableCell>
+                    <TableCell className="text-white font-medium">{account.college}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="bg-secondary/10 text-secondary border-secondary/30">
+                        {account.role}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {isAdmin ? (
+                        <div className="flex items-center gap-1.5 text-primary text-xs font-bold uppercase tracking-wider">
+                          <ShieldCheck className="h-4 w-4" /> Administrator
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground font-medium">Standard User</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {account.accountStatus === 'active' ? (
+                        <div className="flex items-center gap-1.5 text-green-400 text-xs font-bold uppercase tracking-wider">
+                          <ShieldCheck className="h-3 w-3" /> Active
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-destructive text-xs font-bold uppercase tracking-wider">
+                          <Ban className="h-3 w-3" /> Blocked
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setEditingUser(account)}
+                          className="text-white hover:bg-white/10"
+                          title="User Settings"
+                        >
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => toggleAdminPrivilege(account.id, account.institutionalEmail)}
+                          className={isAdmin ? "text-primary hover:bg-primary/10" : "text-white/40 hover:bg-white/10"}
+                          title={isAdmin ? "Revoke Admin Privilege" : "Make Administrator"}
+                        >
+                          {isAdmin ? <ShieldMinus className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => toggleStatus(account.id, account.accountStatus)}
+                          className={account.accountStatus === 'active' ? "text-yellow-500 hover:bg-yellow-500/10" : "text-green-500 hover:bg-green-500/10"}
+                          title={account.accountStatus === 'active' ? "Block User" : "Unblock User"}
+                        >
+                          {account.accountStatus === 'active' ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                        </Button>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-white font-medium">{account.college}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className="bg-secondary/10 text-secondary border-secondary/30">
-                      {account.role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {account.accountStatus === 'active' ? (
-                      <div className="flex items-center gap-1.5 text-green-400 text-xs font-bold uppercase tracking-wider">
-                        <ShieldCheck className="h-3 w-3" /> Active
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 text-destructive text-xs font-bold uppercase tracking-wider">
-                        <Ban className="h-3 w-3" /> Blocked
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => setEditingUser(account)}
-                        className="text-white hover:bg-white/10"
-                        title="User Settings"
-                      >
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => toggleStatus(account.id, account.accountStatus)}
-                        className={account.accountStatus === 'active' ? "text-yellow-500 hover:bg-yellow-500/10" : "text-green-500 hover:bg-green-500/10"}
-                        title={account.accountStatus === 'active' ? "Block User" : "Unblock User"}
-                      >
-                        {account.accountStatus === 'active' ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </Card>
@@ -233,7 +280,7 @@ export default function AccountManagementPage() {
                       id="edit-name" 
                       value={editingUser.fullName} 
                       onChange={(e) => setEditingUser({...editingUser, fullName: e.target.value})}
-                      className="bg-black/20 border-white/5 text-white"
+                      className="bg-black/20 border-white/10 text-white"
                     />
                   </div>
                   <div className="space-y-2">
@@ -242,7 +289,7 @@ export default function AccountManagementPage() {
                       id="edit-id" 
                       value={editingUser.idNumber} 
                       onChange={(e) => setEditingUser({...editingUser, idNumber: e.target.value})}
-                      className="bg-black/20 border-white/5 text-white"
+                      className="bg-black/20 border-white/10 text-white"
                     />
                   </div>
                   <div className="space-y-2">
@@ -251,7 +298,7 @@ export default function AccountManagementPage() {
                       value={editingUser.role} 
                       onValueChange={(v) => setEditingUser({...editingUser, role: v})}
                     >
-                      <SelectTrigger className="bg-black/20 border-white/5 text-white">
+                      <SelectTrigger className="bg-black/20 border-white/10 text-white">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -267,7 +314,7 @@ export default function AccountManagementPage() {
                       id="edit-college" 
                       value={editingUser.college} 
                       onChange={(e) => setEditingUser({...editingUser, college: e.target.value})}
-                      className="bg-black/20 border-white/5 text-white"
+                      className="bg-black/20 border-white/10 text-white"
                     />
                   </div>
                   <div className="space-y-2 col-span-2">
@@ -276,7 +323,7 @@ export default function AccountManagementPage() {
                       id="edit-program" 
                       value={editingUser.program || ''} 
                       onChange={(e) => setEditingUser({...editingUser, program: e.target.value})}
-                      className="bg-black/20 border-white/5 text-white"
+                      className="bg-black/20 border-white/10 text-white"
                     />
                   </div>
                 </div>
