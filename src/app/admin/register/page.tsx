@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/Logo';
-import { ArrowLeft, Loader2, UserPlus, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Loader2, UserPlus } from 'lucide-react';
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
@@ -62,9 +62,15 @@ export default function RegisterPage() {
         accountStatus: 'active',
       });
 
+      // 3. Grant Admin Role (for the prototype, users registering via this page are granted admin status)
+      await setDoc(doc(db, 'roles_admin', user.uid), {
+        email: formData.email,
+        assignedAt: new Date().toISOString()
+      });
+
       toast({
         title: "Account Created",
-        description: "Your NEU institutional account has been registered successfully.",
+        description: "Your NEU institutional account and admin privileges have been registered successfully.",
       });
       
       router.push('/admin/dashboard');
@@ -93,9 +99,9 @@ export default function RegisterPage() {
           <div className="flex justify-center mb-4">
             <Logo className="w-16 h-16" />
           </div>
-          <CardTitle className="text-3xl font-bold text-white font-headline">Register Account</CardTitle>
+          <CardTitle className="text-3xl font-bold text-white font-headline">Register Admin Account</CardTitle>
           <CardDescription className="text-white/60">
-            Create your official library institutional profile
+            Create your official library administrator profile
           </CardDescription>
         </CardHeader>
         <CardContent>
