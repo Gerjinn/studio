@@ -1,0 +1,110 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * NEU LIBRARY ACCESS CONTROL RULES
+     *
+     * CORE PHILOSOPHY:
+     * This ruleset implements a hybrid security model combining strict path-based ownership 
+     * for user profiles with a Document-Based Access Control (DBAC) marker system for 
+     * administrative roles.
+     *
+     * DATA STRUCTURE:
+     * - /userProfiles/{userId}: Private user data, keyed by Firebase Auth UID.
+     * - /visitLogs/{visitLogId}: System-generated records of library attendance.
+     * - /roles_admin/{adminUid}: Marker collection used to designate global administrators.
+     *
+     * KEY SECURITY DECISIONS:
+     * 1. Authorization Independence: We avoid using `get()` calls for standard user 
+     *    authorization by relying on the `{userId}` path parameter.
+     * 2. DBAC Admin Model: Admin status is verified by checking the existence of a 
+     *    document in `/roles_admin/` matching the user's UID.
+     * 3. Delegated Creation: Visit logs are restricted from client-side creation. 
+     *    The application logic requires these to be created via a secure Cloud Function 
+     *    to ensure institutional email validation and account status checks.
+     * 4. Denormalization: User attributes (name, ID number, college) are denormalized 
+     *    into VisitLog documents to allow administrators to perform efficient filtered 
+     *    queries without performing cross-collection joins.
+     */
+
+    // --- Helper Functions ---
+
+    /** Checks if the request is from a signed-in user. */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /** Checks if the authenticated user's UID matches the provided userId. */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /** 
+     * Checks if the authenticated user is an administrator.
+     * Uses the "existence over content" model for efficient, atomic checks.
+     */
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /** Ensures the document exists and the requester is the owner. */
+    function isExistingOwner(userId) {
+      return resource != null && isOwner(userId);
+    }
+
+    // --- Collection Rules ---
+
+    /**
+     * @description Marker collection for designating administrative users.
+     * @path /roles_admin/{adminUid}
+     * @allow (get) Any signed-in user checking their own status.
+     * @deny (list, create, update, delete) Restricted to prevent unauthorized role escalation.
+     * @principle Uses existence-based role assignment to avoid costly rule evaluations.
+     */
+    match /roles_admin/{adminUid} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create, update, delete: if false; // Admin roles managed via Console or CLI for safety.
+    }
+
+    /**
+     * @description User profiles for NEU students, faculty, and employees.
+     * @path /userProfiles/{userId}
+     * @allow (create) If the user's UID matches the document ID.
+     * @allow (update) By the owner or an administrator.
+     * @deny (list) Prevented for standard users to avoid data scraping.
+     * @principle Path-based ownership ensures atomic security without extra lookups.
+     */
+    match /userProfiles/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      
+      allow create: if isOwner(userId) 
+                    && request.resource.data.id == userId;
+      
+      allow update: if (isExistingOwner(userId) || (resource != null && isAdmin()))
+                    && request.resource.data.id == resource.data.id;
+      
+      allow delete: if resource != null && isAdmin();
+    }
+
+    /**
+     * @description Records of library attendance containing denormalized visitor data.
+     * @path /visitLogs/{visitLogId}
+     * @allow (get, list) Restricted to administrators for reporting and auditing.
+     * @deny (create) Direct client writes are forbidden; handled by secure Cloud Functions.
+     * @principle Structural segregation of system-generated logs from user-generated content.
+     */
+    match /visitLogs/{visitLogId} {
+      allow get, list: if isAdmin();
+      
+      // CRITICAL: Visit logs must be created via Cloud Functions to validate 
+      // institutional identity and account status. Direct client creation is disabled.
+      allow create: if false; 
+      
+      allow update, delete: if resource != null && isAdmin();
+    }
+
+  }
+}

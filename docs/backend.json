@@ -1,0 +1,151 @@
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a registered student, faculty member, or employee of New Era University (NEU). These profiles are used for logging library visits and for administrative account management.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserProfile entity."
+        },
+        "institutionalEmail": {
+          "type": "string",
+          "description": "The official institutional email address of the user. This is used for identification during library visits and for admin login purposes (though authentication is external).",
+          "format": "email"
+        },
+        "fullName": {
+          "type": "string",
+          "description": "The full name of the user."
+        },
+        "idNumber": {
+          "type": "string",
+          "description": "The unique identification number assigned by New Era University (e.g., student ID, employee ID)."
+        },
+        "role": {
+          "type": "string",
+          "description": "The role or type of the user within the university. Possible values: 'Student', 'Faculty', 'Employee'."
+        },
+        "program": {
+          "type": "string",
+          "description": "The academic program or course of study for students (e.g., BSIT, BSCS, BSME) or the primary department for faculty/employees. This field might be empty if not applicable."
+        },
+        "college": {
+          "type": "string",
+          "description": "The college or department the user belongs to within NEU (e.g., CICS, Education, Nursing, Arts, Engineering, Business)."
+        },
+        "accountStatus": {
+          "type": "string",
+          "description": "The current status of the user's account, indicating if they are active or blocked. Possible values: 'active', 'blocked'."
+        }
+      },
+      "required": [
+        "id",
+        "institutionalEmail",
+        "fullName",
+        "idNumber",
+        "role",
+        "accountStatus"
+      ]
+    },
+    "VisitLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "VisitLog",
+      "type": "object",
+      "description": "Records each instance of a user visiting the NEU Library, including the visitor's identity, entry time, and the purpose of their visit.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the VisitLog entry."
+        },
+        "visitorId": {
+          "type": "string",
+          "description": "Reference to the UserProfile entity who made the visit. (Relationship: UserProfile 1:N VisitLog)"
+        },
+        "entryTime": {
+          "type": "string",
+          "description": "The date and time when the user entered the library.",
+          "format": "date-time"
+        },
+        "purpose": {
+          "type": "string",
+          "description": "The primary reason for the user's visit to the library. Possible values: 'Assignment', 'Use of Computer', 'Board games', 'Researching', 'Reading', 'Other'."
+        },
+        "otherPurposeDetails": {
+          "type": "string",
+          "description": "Optional field to capture free-text details if the purpose is 'Other', which can be used for AI categorization."
+        },
+        "categorizedPurpose": {
+          "type": "string",
+          "description": "Optional field populated by an AI tool to provide a more specific category if 'Other' was selected for the `purpose`."
+        }
+      },
+      "required": [
+        "id",
+        "visitorId",
+        "entryTime",
+        "purpose"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/userProfiles/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores individual user profiles for students, faculty, and employees. The `userId` in the path corresponds to the Firebase Authentication UID. Access is managed such that a user can read their own profile, and administrators have full management capabilities. Includes `accountStatus` for explicit state modeling.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique Firebase Authentication User ID (UID) of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/visitLogs/{visitLogId}",
+        "definition": {
+          "entityName": "VisitLog",
+          "schema": {
+            "$ref": "#/backend/entities/VisitLog"
+          },
+          "description": "Records each instance of a user visiting the NEU Library. The `visitorId` links to the `UserProfile` entity. For efficient querying and to support admin dashboard features (search, filter by visitor details like name, ID number, college, program), this document will include denormalized fields such as `visitorFullName`, `visitorIdNumber`, `visitorRole`, `visitorProgram`, and `visitorCollege` from the associated `UserProfile`. Creation of new `VisitLog` entries will primarily be handled via a secure Cloud Function to validate `institutionalEmail` and `UserProfile` `accountStatus`, ensuring Authorization Independence in security rules.",
+          "params": [
+            {
+              "name": "visitLogId",
+              "description": "The unique identifier for a specific library visit log entry."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{adminUid}",
+        "definition": {
+          "entityName": "AdminRole",
+          "schema": {
+            "$ref": "#/backend/entities/AdminRole"
+          },
+          "description": "This collection is used for defining global administrative roles. The existence of a document at `/roles_admin/{adminUid}` (where `adminUid` is a Firebase Authentication User ID) grants administrator privileges to that user. This employs an 'existence over content' DBAC model for role-based access control, avoiding `get()` calls for authorization checks. (Note: The `AdminRole` schema is implicitly a simple marker document, with the document ID serving as the primary identifier for the admin user.)",
+          "params": [
+            {
+              "name": "adminUid",
+              "description": "The Firebase Authentication User ID (UID) of an administrator."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The recommended Firestore data structure prioritizes Authorization Independence, Structural Segregation, and consistent Access Modeling to ensure security, scalability, and debuggability for EpochReads. \n\n1.  **Authorization Independence & Denormalization:**\n    *   For `/userProfiles/{userId}`, ownership is explicitly defined by the path parameter `{userId}` matching `request.auth.uid`. This direct mapping eliminates the need for `get()` calls in rules to determine ownership, making authorization atomic and straightforward (e.g., `allow read: if request.auth.uid == userId;`).\n    *   For `/visitLogs/{visitLogId}`, creation by unauthenticated users (via institutional email) requires validation against existing `UserProfile` documents. To strictly adhere to the mandate of avoiding `get()` calls in security rules for authorization, the *creation* of `VisitLog` documents will be mediated by a **Cloud Function**. The client will submit the institutional email and visit purpose to this function. The Cloud Function will then perform the `UserProfile` lookup, validate the email, check the `accountStatus`, and securely write the `VisitLog` document to Firestore. This shifts complex validation logic out of the security rules, maintaining their simplicity and atomic integrity. Furthermore, to support the extensive search and filter capabilities required for the admin dashboard (e.g., by visitor name, ID number, college, program), critical fields from the `UserProfile` (such as `visitorFullName`, `visitorIdNumber`, `visitorRole`, `visitorProgram`, `visitorCollege`) are **denormalized** directly into each `VisitLog` document. This allows for efficient, single-collection queries without needing client-side joins or `get()` calls within rules for read operations.\n    *   Admin roles are managed through the `/roles_admin/{adminUid}` collection. An administrator's privilege is determined by the *existence* of a document with their `uid` as the document ID. This 'existence over content' model makes admin checks simple and independent (`allow read: if exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));`), fully compliant with Authorization Independence.\n\n2.  **QAPs (Rules are not Filters):**\n    *   The `/userProfiles/{userId}` path allows for direct, QAP-compliant reads for individual users based on their UID. For administrators, global `list` operations are enabled by their role, and specific queries (e.g., searching by `idNumber`, `college`) can be performed efficiently due to the `UserProfile` fields being directly present.\n    *   The `/visitLogs/{visitLogId}` collection is designed as a top-level collection. By denormalizing `UserProfile` attributes directly into `VisitLog` documents (e.g., `visitorFullName`, `visitorCollege`), administrators can execute highly efficient, QAP-compliant `list` queries with various filters and sorts (e.g., by `visitorCollege`, `purpose`, `entryTime`) directly on the `visitLogs` collection without relying on `get()` calls or inefficient client-side joins. This supports all dashboard and visitor log search requirements effectively.\n    *   The `/roles_admin/{adminUid}` collection allows for a single, efficient check of admin status without filtering through documents to find a role.\n\n3.  **Structural Segregation & Access Modeling:**\n    *   Each collection (`/userProfiles`, `/visitLogs`, `/roles_admin`) serves a distinct purpose and maintains a homogeneous security posture. There is no mixing of publicly editable and private data within the same collection. \n    *   `/userProfiles` uses path-based ownership for individual users and global access for admins. `/visitLogs` is a top-level collection optimized for admin reads and managed writes. `/roles_admin` implements a robust DBAC model using existence checks.\n\nThis structure ensures a clean separation of concerns, simplifies security rules by pushing complexity to structure and Cloud Functions, and supports performant querying for all required application features."
+  }
+}
