@@ -3,21 +3,18 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/Logo';
 import { ShieldAlert, ArrowLeft, Loader2 } from 'lucide-react';
-import { useAuth, useUser, useFirestore } from '@/firebase';
+import { useAuth, useUser } from '@/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const auth = useAuth();
-  const db = useFirestore();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
   
@@ -26,45 +23,32 @@ export default function AdminLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    // If user is already logged in with the correct domain, redirect to dashboard
     if (!isUserLoading && user && user.email?.endsWith('@neu.edu.ph')) {
-      // Ensure the admin role document exists if they are already logged in
-      const adminRef = doc(db, 'roles_admin', user.uid);
-      setDoc(adminRef, {
-        email: user.email,
-        lastLogin: new Date().toISOString()
-      }, { merge: true });
-      
       router.push('/admin/dashboard');
     }
-  }, [user, isUserLoading, router, db]);
+  }, [user, isUserLoading, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.includes('@neu.edu.ph')) {
       toast({
         variant: "destructive",
-        title: "Invalid Domain",
-        description: "Please use your @neu.edu.ph institutional email.",
+        title: "Access Denied",
+        description: "Only @neu.edu.ph institutional accounts can access the admin portal.",
       });
       return;
     }
 
     setIsLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
-      // Ensure the user has an admin role entry upon login
-      await setDoc(doc(db, 'roles_admin', userCredential.user.uid), {
-        email: userCredential.user.email,
-        lastLogin: new Date().toISOString()
-      }, { merge: true });
-
+      await signInWithEmailAndPassword(auth, email, password);
       router.push('/admin/dashboard');
     } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Login Failed",
-        description: error.message || "Invalid credentials. Please try again.",
+        description: "Invalid credentials. Please contact the IT department if you cannot sign in.",
       });
     } finally {
       setIsLoading(false);
@@ -73,7 +57,7 @@ export default function AdminLoginPage() {
 
   if (isUserLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center neu-gradient">
+      <div className="min-h-screen flex items-center justify-center bg-[#1a2c38]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -93,15 +77,15 @@ export default function AdminLoginPage() {
           <div className="flex justify-center mb-4">
             <Logo className="w-20 h-20 shadow-xl shadow-primary/10" />
           </div>
-          <CardTitle className="text-3xl font-bold text-white font-headline">Admin Access</CardTitle>
+          <CardTitle className="text-3xl font-bold text-white font-headline">Admin Portal</CardTitle>
           <CardDescription className="text-white/60">
-            Sign in with your administrator institutional account
+            Secure access for NEU Library Administrators
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-white/80">NEU Email</label>
+              <label className="text-sm font-medium text-white/80">Institutional Email</label>
               <Input
                 type="email"
                 placeholder="admin.name@neu.edu.ph"
@@ -142,18 +126,9 @@ export default function AdminLoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-sm text-white/60">
-              Don't have an account?{' '}
-              <Link href="/admin/register" className="text-primary hover:underline font-bold">
-                Register here
-              </Link>
-            </p>
-          </div>
-
           <div className="mt-8 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-xs text-yellow-200/80 leading-relaxed">
             <p className="font-bold mb-1 uppercase tracking-wider text-yellow-500">Notice</p>
-            Unauthorized access attempts are logged and reported to the NEU IT Department.
+            This system is for authorized personnel only. All access attempts are monitored and recorded by the NEU IT Department.
           </div>
         </CardContent>
       </Card>

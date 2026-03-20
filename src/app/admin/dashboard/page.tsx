@@ -35,8 +35,8 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { format, isToday, isThisWeek, isThisMonth, parseISO } from 'date-fns';
-import { useFirestore, useCollection, useMemoFirebase, useUser, setDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, doc } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
@@ -44,30 +44,19 @@ export default function DashboardPage() {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   
-  // Ensure the admin role document exists if they land here
   useEffect(() => {
-    if (!isUserLoading && !user) {
+    if (!isUserLoading && (!user || !user.email?.endsWith('@neu.edu.ph'))) {
       router.push('/admin/login');
-      return;
     }
-    
-    if (user && user.email?.endsWith('@neu.edu.ph')) {
-      const adminRef = doc(db, 'roles_admin', user.uid);
-      setDocumentNonBlocking(adminRef, {
-        email: user.email,
-        lastLogin: new Date().toISOString()
-      }, { merge: true });
-    }
-  }, [user, isUserLoading, router, db]);
+  }, [user, isUserLoading, router]);
 
   const visitsQuery = useMemoFirebase(() => {
     if (!user) return null;
     return query(collection(db, 'visitLogs'), orderBy('entryTime', 'desc'));
   }, [db, user]);
 
-  const { data: visits, isLoading: isLogsLoading, error: logsError } = useCollection(visitsQuery);
+  const { data: visits, isLoading: isLogsLoading } = useCollection(visitsQuery);
 
-  // Derived statistics
   const stats = useMemo(() => {
     if (!visits) return { today: 0, week: 0, month: 0 };
     
@@ -77,9 +66,7 @@ export default function DashboardPage() {
         if (isToday(date)) acc.today++;
         if (isThisWeek(date)) acc.week++;
         if (isThisMonth(date)) acc.month++;
-      } catch (e) {
-        // Skip malformed dates
-      }
+      } catch (e) {}
       return acc;
     }, { today: 0, week: 0, month: 0 });
   }, [visits]);
@@ -132,7 +119,7 @@ export default function DashboardPage() {
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold font-headline text-white">Dashboard Overview</h1>
-            <p className="text-muted-foreground">Real-time statistics for NEU Library visitors.</p>
+            <p className="text-muted-foreground">Administrative insights for EpochReads.</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" className="bg-card border-border/50 text-white gap-2">
@@ -146,18 +133,11 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        {logsError && (
-          <div className="mb-8 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm font-bold">
-            Notice: Your administrative permissions are still being verified. Live data may be limited.
-          </div>
-        )}
-
-        {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {[
-            { label: 'Total Visitors Today', value: stats.today.toString(), icon: Users, trend: '+0%' },
-            { label: 'This Week', value: stats.week.toString(), icon: TrendingUp, trend: '+0%' },
-            { label: 'This Month', value: stats.month.toString(), icon: Calendar, trend: '+0%' },
+            { label: 'Total Visitors Today', value: stats.today.toString(), icon: Users },
+            { label: 'This Week', value: stats.week.toString(), icon: TrendingUp },
+            { label: 'This Month', value: stats.month.toString(), icon: Calendar },
           ].map((stat, i) => (
             <Card key={i} className="bg-card/30 border-white/5 backdrop-blur-md overflow-hidden relative group">
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -169,24 +149,19 @@ export default function DashboardPage() {
               <CardContent>
                 <div className="flex items-end justify-between">
                   <h3 className="text-4xl font-black text-white">{stat.value}</h3>
-                  <span className="text-xs font-bold text-green-400 bg-green-400/10 px-2 py-1 rounded-full flex items-center gap-1">
-                    <TrendingUp className="h-3 w-3" /> {stat.trend}
-                  </span>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <Card className="bg-card/30 border-white/5">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-lg font-bold">Visitors by College</CardTitle>
-                <p className="text-xs text-muted-foreground">Distribution across NEU departments</p>
+                <p className="text-xs text-muted-foreground">Live distribution</p>
               </div>
-              <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
             </CardHeader>
             <CardContent>
               <div className="h-[300px] w-full">
@@ -222,9 +197,8 @@ export default function DashboardPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-lg font-bold">Visit Purposes</CardTitle>
-                <p className="text-xs text-muted-foreground">Activity breakdown trends</p>
+                <p className="text-xs text-muted-foreground">Activity breakdown</p>
               </div>
-              <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
             </CardHeader>
             <CardContent>
               <div className="h-[300px] w-full flex items-center justify-center">
@@ -248,63 +222,30 @@ export default function DashboardPage() {
                     />
                   </PieChart>
                 </ResponsiveContainer>
-                <div className="grid grid-cols-2 gap-x-8 gap-y-2 ml-4">
-                  {purposeChartData.map((p) => (
-                    <div key={p.name} className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{backgroundColor: p.fill}} />
-                      <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{p.name}</span>
-                      <span className="text-[10px] font-bold text-white">{p.value}</span>
-                    </div>
-                  ))}
-                </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Recent Visits Table */}
         <Card className="bg-card/30 border-white/5">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-lg font-bold">Recent Visits Log</CardTitle>
-              <p className="text-xs text-muted-foreground">Live feed of library entries</p>
-            </div>
+          <CardHeader>
+            <CardTitle className="text-lg font-bold">Recent Activity</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader className="bg-white/5">
-                <TableRow className="border-white/5 hover:bg-transparent">
-                  <TableHead className="text-white font-bold">Visitor Name</TableHead>
-                  <TableHead className="text-white font-bold">ID Number</TableHead>
-                  <TableHead className="text-white font-bold">Entry Time</TableHead>
-                  <TableHead className="text-white font-bold">Program</TableHead>
-                  <TableHead className="text-white font-bold">Purpose</TableHead>
+                <TableRow className="border-white/5">
+                  <TableHead className="text-white">Visitor</TableHead>
+                  <TableHead className="text-white">Time</TableHead>
+                  <TableHead className="text-white">Purpose</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentVisits.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-12 text-muted-foreground italic">
-                      No visit records found yet.
-                    </TableCell>
-                  </TableRow>
-                ) : recentVisits.map((v) => (
-                  <TableRow key={v.id} className="border-white/5 hover:bg-white/5">
-                    <TableCell className="font-medium text-white">{v.visitorFullName}</TableCell>
-                    <TableCell className="text-muted-foreground">{v.visitorIdNumber}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {v.entryTime ? format(parseISO(v.entryTime), 'h:mm a, MMM d') : 'N/A'}
-                    </TableCell>
-                    <TableCell className="text-white">
-                      <span className="bg-primary/20 text-primary px-2 py-0.5 rounded text-[10px] font-bold uppercase">
-                        {v.visitorProgram || 'N/A'}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="bg-secondary/20 text-secondary px-2 py-0.5 rounded text-[10px] font-bold">
-                        {v.categorizedPurpose || v.purpose}
-                      </span>
-                    </TableCell>
+                {recentVisits.map((v) => (
+                  <TableRow key={v.id} className="border-white/5">
+                    <TableCell className="text-white">{v.visitorFullName}</TableCell>
+                    <TableCell className="text-muted-foreground">{v.entryTime ? format(parseISO(v.entryTime), 'h:mm a') : 'N/A'}</TableCell>
+                    <TableCell className="text-primary font-bold">{v.categorizedPurpose || v.purpose}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

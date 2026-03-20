@@ -15,9 +15,9 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // A robust check for admin status: 
+    // Admin check: 
     // 1. Explicitly defined in the roles_admin collection
-    // 2. OR possesses a valid institutional email domain
+    // 2. OR possesses a valid institutional email domain (bootstrap/prototype access)
     function isAdmin() {
       return isSignedIn() && (
         exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) ||
@@ -27,31 +27,23 @@ service cloud.firestore {
 
     match /roles_admin/{adminUid} {
       allow get: if isSignedIn();
-      allow list: if isAdmin();
-      // Allow self-registration as admin for users with institutional emails
-      allow create: if isSignedIn() && request.auth.uid == adminUid && request.auth.token.email.matches('^.*@neu\\.edu\\.ph$');
-      allow update: if isAdmin() && request.auth.uid == adminUid;
-      allow delete: if false;
+      allow list, create, update, delete: if isAdmin();
     }
 
     match /userProfiles/{userId} {
-      // Allow get and list for anyone to support searching for institutional emails during library entry
-      allow get, list: if true;
+      // Allow list and get for everyone to support finding profiles by institutional email during library entry
+      allow list, get: if true;
       
-      // Allow creation/updates only by the owner or an admin
-      allow create, update: if isOwner(userId) || isAdmin();
-      
-      allow delete: if isAdmin();
+      // Strict: Only admins can manage (add/edit/delete) user profiles
+      allow create, update, delete: if isAdmin();
     }
 
     match /visitLogs/{visitLogId} {
-      // Allow listing and reading if the user is an admin
-      allow get, list: if isAdmin();
+      // Admins have full access to view and manage logs
+      allow get, list, update, delete: if isAdmin();
       
-      // Allow creation for visitors (students/employees logging their visit)
+      // Anyone can create a visit log (visitors checking in)
       allow create: if true; 
-      
-      allow update, delete: if isAdmin();
     }
 
   }
