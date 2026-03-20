@@ -78,10 +78,14 @@ export default function AccountManagementPage() {
   const filteredAccounts = useMemo(() => {
     if (!accounts) return [];
     return accounts.filter(acc => {
+      const name = acc.fullName || '';
+      const idNum = acc.idNumber || '';
+      const email = acc.institutionalEmail || '';
+      
       const matchesSearch = 
-        acc.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        acc.idNumber.includes(searchTerm) ||
-        acc.institutionalEmail.toLowerCase().includes(searchTerm.toLowerCase());
+        name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        idNum.includes(searchTerm) ||
+        email.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesRole = roleFilter === 'all' || acc.role === roleFilter;
       const matchesCollege = collegeFilter === 'all' || acc.college === collegeFilter;
@@ -107,7 +111,7 @@ export default function AccountManagementPage() {
       deleteDocumentNonBlocking(adminRef);
       toast({
         title: "Privileges Revoked",
-        description: "User is no longer an administrator.",
+        description: "User no longer has dashboard access.",
       });
     } else {
       setDocumentNonBlocking(adminRef, {
@@ -116,7 +120,7 @@ export default function AccountManagementPage() {
       }, { merge: true });
       toast({
         title: "Privileges Granted",
-        description: "User has been promoted to administrator.",
+        description: "User now has dashboard access.",
       });
     }
   };
@@ -130,11 +134,12 @@ export default function AccountManagementPage() {
     
     updateDocumentNonBlocking(userRef, updateData);
     
-    // Sync admin role based on the role selection or explicit toggle
-    const currentIsAdmin = adminUids.has(id);
-    const shouldBeAdmin = editingUser.role === 'Admin';
-    if (shouldBeAdmin !== currentIsAdmin) {
-      handleToggleAdmin(id, editingUser.institutionalEmail, currentIsAdmin);
+    // Sync admin/staff access: Admins and Employees should be in roles_admin
+    const currentHasStaffAccess = adminUids.has(id);
+    const shouldHaveStaffAccess = editingUser.role === 'Admin' || editingUser.role === 'Employee';
+    
+    if (shouldHaveStaffAccess !== currentHasStaffAccess) {
+      handleToggleAdmin(id, editingUser.institutionalEmail, currentHasStaffAccess);
     }
     
     toast({
@@ -257,18 +262,18 @@ export default function AccountManagementPage() {
             </TableHeader>
             <TableBody>
               {filteredAccounts.map((account) => {
-                const isAdmin = adminUids.has(account.id) || account.role === 'Admin';
+                const hasStaffAccess = adminUids.has(account.id);
                 return (
                   <TableRow key={account.id} className="border-white/5 hover:bg-white/5">
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary font-black">
-                          {account.fullName.charAt(0)}
+                          {account.fullName?.charAt(0) || '?'}
                         </div>
                         <div>
                           <p className="font-bold text-white leading-tight">
                             {account.fullName} 
-                            {isAdmin && <ShieldCheck className="inline h-3 w-3 ml-1 text-primary" />}
+                            {hasStaffAccess && <ShieldCheck className="inline h-3 w-3 ml-1 text-primary" />}
                           </p>
                           <p className="text-xs text-muted-foreground font-mono">{account.idNumber}</p>
                         </div>
@@ -304,6 +309,14 @@ export default function AccountManagementPage() {
                           className={account.accountStatus === 'active' ? "text-yellow-500 hover:bg-yellow-500/10" : "text-green-500 hover:bg-green-500/10"}
                         >
                           {account.accountStatus === 'active' ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleDeleteUser(account.id)}
+                          className="text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -378,11 +391,11 @@ export default function AccountManagementPage() {
 
                 <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5">
                   <div className="space-y-0.5">
-                    <Label className="text-base font-bold">Administrator Privileges</Label>
-                    <p className="text-xs text-muted-foreground">Grant access to dashboard and logs</p>
+                    <Label className="text-base font-bold">Dashboard Access</Label>
+                    <p className="text-xs text-muted-foreground">Allow login to Admin Portal</p>
                   </div>
                   <Switch 
-                    checked={adminUids.has(editingUser.id) || editingUser.role === 'Admin'} 
+                    checked={adminUids.has(editingUser.id)} 
                     onCheckedChange={(checked) => handleToggleAdmin(editingUser.id, editingUser.institutionalEmail, !checked)}
                   />
                 </div>

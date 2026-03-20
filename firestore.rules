@@ -12,12 +12,12 @@ service cloud.firestore {
     }
 
     // Staff/Admin check: 
-    // Now strictly uses the roles_admin collection (DBAC model)
-    // for Authorization Independence. Only users explicitly added to this 
-    // collection by an administrator can access logs and management features.
+    // Uses the roles_admin collection (DBAC model) for Authorization Independence.
+    // Also allows the master bootstrap account.
     function isStaff() {
       return isSignedIn() && (
-        exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid))
+        exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) ||
+        request.auth.token.email == 'gerjinn.yallung@neu.edu.ph'
       );
     }
 
@@ -25,7 +25,7 @@ service cloud.firestore {
       // Users can check their own admin status
       allow get: if isSignedIn();
       // Only existing staff can list or manage staff roles
-      allow list, create, update, delete: if isStaff() || (isSignedIn() && request.auth.token.email == 'gerjinn.yallung@neu.edu.ph');
+      allow list, create, update, delete: if isStaff();
     }
 
     match /userProfiles/{userId} {
@@ -33,12 +33,12 @@ service cloud.firestore {
       allow list, get: if true;
       
       // Only staff can manage user profiles
-      allow create, update, delete: if isStaff() || (isSignedIn() && request.auth.token.email == 'gerjinn.yallung@neu.edu.ph');
+      allow create, update, delete: if isStaff();
     }
 
     match /visitLogs/{visitLogId} {
       // Staff can view and manage logs
-      allow get, list, update, delete: if isStaff() || (isSignedIn() && request.auth.token.email == 'gerjinn.yallung@neu.edu.ph');
+      allow get, list, update, delete: if isStaff();
       
       // Publicly allowed to create a log entry (visitors checking in)
       allow create: if true; 
