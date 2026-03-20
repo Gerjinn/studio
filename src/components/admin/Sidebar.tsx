@@ -8,6 +8,7 @@ import { LayoutDashboard, ClipboardList, Users, LogOut, ChevronRight } from 'luc
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { useAuth, useUser } from '@/firebase';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
@@ -18,7 +19,13 @@ const NAV_ITEMS = [
 export function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const adminEmail = "admin.lib@neu.edu.ph"; // Mock data
+  const auth = useAuth();
+  const { user } = useUser();
+
+  const handleLogout = async () => {
+    await auth.signOut();
+    router.push('/admin/login');
+  };
 
   return (
     <aside className="w-72 bg-sidebar border-r border-sidebar-border h-screen flex flex-col fixed left-0 top-0 z-50">
@@ -61,14 +68,14 @@ export function AdminSidebar() {
       <div className="p-6 mt-auto">
         <div className="bg-sidebar-accent/50 rounded-2xl p-4 mb-4 border border-sidebar-border/50">
           <p className="text-xs text-muted-foreground mb-1 uppercase font-bold tracking-tighter">Current Session</p>
-          <p className="text-sm font-medium text-sidebar-foreground truncate" title={adminEmail}>
-            {adminEmail}
+          <p className="text-sm font-medium text-sidebar-foreground truncate" title={user?.email || 'Not signed in'}>
+            {user?.email || 'Loading...'}
           </p>
         </div>
         <Button 
           variant="outline" 
           className="w-full justify-start gap-3 border-white/5 bg-white/5 hover:bg-destructive hover:text-white transition-colors"
-          onClick={() => router.push('/')}
+          onClick={handleLogout}
         >
           <LogOut className="h-4 w-4" />
           Logout

@@ -9,13 +9,15 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/Logo';
 import { ShieldAlert, ArrowLeft, Loader2 } from 'lucide-react';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore } from '@/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const auth = useAuth();
+  const db = useFirestore();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
   
@@ -42,7 +44,14 @@ export default function AdminLoginPage() {
 
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      // For the prototype, ensure the user has an admin role entry upon login
+      await setDoc(doc(db, 'roles_admin', userCredential.user.uid), {
+        email: userCredential.user.email,
+        lastLogin: new Date().toISOString()
+      }, { merge: true });
+
       router.push('/admin/dashboard');
     } catch (error: any) {
       toast({
