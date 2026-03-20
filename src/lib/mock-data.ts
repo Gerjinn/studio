@@ -10,13 +10,6 @@ export const COLLEGES = [
   'Music'
 ];
 
-export const PROGRAMS: Record<string, string[]> = {
-  'CICS': ['BSIT', 'BSCS', 'BSIS'],
-  'Engineering': ['BSME', 'BSEE', 'BSCE', 'BSECE'],
-  'Nursing': ['BSN'],
-  'Business Administration': ['BSBA', 'BSA'],
-};
-
 export const VISIT_PURPOSES = [
   'Assignment',
   'Use of Computer',
@@ -33,7 +26,6 @@ export interface Visitor {
   email: string;
   entryTime: string;
   college: string;
-  program: string;
   purpose: string;
   role: 'Student' | 'Staff' | 'Faculty' | 'Admin';
 }

@@ -9,13 +9,12 @@ import { Button } from '@/components/ui/button';
 import { 
   Search, 
   Download, 
-  Filter,
-  Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
   School,
   Activity,
-  Loader2
+  Loader2,
+  Trash2
 } from 'lucide-react';
 import { 
   Table, 
@@ -34,12 +33,14 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, query, orderBy, doc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 export default function VisitorLogPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const db = useFirestore();
+  const { toast } = useToast();
 
   const visitsQuery = useMemoFirebase(() => {
     return query(collection(db, 'visitLogs'), orderBy('entryTime', 'desc'));
@@ -55,6 +56,17 @@ export default function VisitorLogPage() {
       v.visitorEmail.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [visits, searchTerm]);
+
+  const handleDeleteLog = (logId: string) => {
+    if (confirm('Are you sure you want to delete this visit log?')) {
+      const logRef = doc(db, 'visitLogs', logId);
+      deleteDocumentNonBlocking(logRef);
+      toast({
+        title: "Log Deleted",
+        description: "The visit record has been permanently removed.",
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -82,7 +94,7 @@ export default function VisitorLogPage() {
         <Card className="bg-card/30 border-white/5 mb-8">
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="relative col-span-2">
+              <div className="relative col-span-3">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
                   placeholder="Search Name, ID, or Email..." 
@@ -101,11 +113,6 @@ export default function VisitorLogPage() {
                   <SelectItem value="Employee">Employee</SelectItem>
                 </SelectContent>
               </Select>
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1 border-white/10 bg-card gap-2 text-white">
-                  <CalendarIcon className="h-4 w-4" /> All Time
-                </Button>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -127,9 +134,10 @@ export default function VisitorLogPage() {
               <TableRow className="border-white/5">
                 <TableHead className="text-white font-bold py-5">Visitor</TableHead>
                 <TableHead className="text-white font-bold">Email</TableHead>
-                <TableHead className="text-white font-bold">Role & Dept</TableHead>
+                <TableHead className="text-white font-bold">Role & College</TableHead>
                 <TableHead className="text-white font-bold">Reason for Visit</TableHead>
                 <TableHead className="text-white font-bold">Time In</TableHead>
+                <TableHead className="text-white font-bold text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -151,7 +159,7 @@ export default function VisitorLogPage() {
                     <div className="flex flex-col gap-1">
                       <Badge variant="outline" className="w-fit border-primary/30 text-primary text-[10px] py-0">{v.visitorRole}</Badge>
                       <div className="flex items-center gap-1 text-[11px] text-white/70 font-bold">
-                        <School className="h-3 w-3 text-secondary" /> {v.visitorCollege} {v.visitorProgram ? `- ${v.visitorProgram}` : ''}
+                        <School className="h-3 w-3 text-secondary" /> {v.visitorCollege}
                       </div>
                     </div>
                   </TableCell>
@@ -163,6 +171,16 @@ export default function VisitorLogPage() {
                   <TableCell>
                     <p className="text-white font-medium">{format(parseISO(v.entryTime), 'h:mm a')}</p>
                     <p className="text-[10px] text-muted-foreground">{format(parseISO(v.entryTime), 'MMMM d, yyyy')}</p>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleDeleteLog(v.id)}
+                      className="text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

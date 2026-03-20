@@ -17,7 +17,8 @@ import {
   Settings,
   Save,
   ShieldAlert,
-  ShieldMinus
+  ShieldMinus,
+  Trash2
 } from 'lucide-react';
 import { 
   Table, 
@@ -43,6 +44,7 @@ import {
   DialogFooter
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, doc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
@@ -91,11 +93,10 @@ export default function AccountManagementPage() {
     });
   };
 
-  const toggleAdminPrivilege = (userId: string, email: string) => {
-    const isAdmin = adminUids.has(userId);
+  const handleToggleAdmin = (userId: string, email: string, currentIsAdmin: boolean) => {
     const adminRef = doc(db, 'roles_admin', userId);
 
-    if (isAdmin) {
+    if (currentIsAdmin) {
       deleteDocumentNonBlocking(adminRef);
       toast({
         title: "Privileges Revoked",
@@ -129,6 +130,23 @@ export default function AccountManagementPage() {
     setEditingUser(null);
   };
 
+  const handleDeleteUser = (userId: string) => {
+    if (confirm('Are you sure you want to delete this user profile? This action cannot be undone.')) {
+      const userRef = doc(db, 'userProfiles', userId);
+      const adminRef = doc(db, 'roles_admin', userId);
+      
+      deleteDocumentNonBlocking(userRef);
+      deleteDocumentNonBlocking(adminRef);
+      
+      toast({
+        variant: "destructive",
+        title: "Account Deleted",
+        description: "The user profile and associated roles have been removed.",
+      });
+      setEditingUser(null);
+    }
+  };
+
   if (isAccountsLoading || isAdminsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#1a2c38]">
@@ -152,7 +170,6 @@ export default function AccountManagementPage() {
           </Button>
         </header>
 
-        {/* Filters and Search */}
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -169,7 +186,6 @@ export default function AccountManagementPage() {
           <CardHeader className="pb-2 border-b border-white/5">
             <div className="flex justify-between items-center">
               <CardTitle className="text-lg font-bold">Total Profiles: {filteredAccounts.length}</CardTitle>
-              <p className="text-xs text-muted-foreground">Manage student, staff and faculty access</p>
             </div>
           </CardHeader>
           <Table>
@@ -178,7 +194,7 @@ export default function AccountManagementPage() {
                 <TableHead className="text-white font-bold py-5">User Info <ArrowUpDown className="ml-2 h-3 w-3 inline" /></TableHead>
                 <TableHead className="text-white font-bold">College</TableHead>
                 <TableHead className="text-white font-bold">Role</TableHead>
-                <TableHead className="text-white font-bold">Admin Status</TableHead>
+                <TableHead className="text-white font-bold">Admin</TableHead>
                 <TableHead className="text-white font-bold">Status</TableHead>
                 <TableHead className="text-white font-bold text-right">Actions</TableHead>
               </TableRow>
@@ -191,12 +207,11 @@ export default function AccountManagementPage() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary font-black">
-                          {account.fullName.split(' ').map((n: string) => n[0]).join('')}
+                          {account.fullName.charAt(0)}
                         </div>
                         <div>
                           <p className="font-bold text-white leading-tight">{account.fullName}</p>
                           <p className="text-xs text-muted-foreground font-mono">{account.idNumber}</p>
-                          <p className="text-[10px] text-muted-foreground">{account.institutionalEmail}</p>
                         </div>
                       </div>
                     </TableCell>
@@ -208,22 +223,16 @@ export default function AccountManagementPage() {
                     </TableCell>
                     <TableCell>
                       {isAdmin ? (
-                        <div className="flex items-center gap-1.5 text-primary text-xs font-bold uppercase tracking-wider">
-                          <ShieldCheck className="h-4 w-4" /> Administrator
-                        </div>
+                        <ShieldCheck className="h-5 w-5 text-primary" />
                       ) : (
-                        <span className="text-xs text-muted-foreground font-medium">Standard User</span>
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
                     <TableCell>
                       {account.accountStatus === 'active' ? (
-                        <div className="flex items-center gap-1.5 text-green-400 text-xs font-bold uppercase tracking-wider">
-                          <ShieldCheck className="h-3 w-3" /> Active
-                        </div>
+                        <Badge className="bg-green-400/20 text-green-400 border-none">Active</Badge>
                       ) : (
-                        <div className="flex items-center gap-1.5 text-destructive text-xs font-bold uppercase tracking-wider">
-                          <Ban className="h-3 w-3" /> Blocked
-                        </div>
+                        <Badge variant="destructive" className="bg-destructive/20 text-destructive border-none">Blocked</Badge>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
@@ -233,25 +242,14 @@ export default function AccountManagementPage() {
                           size="sm" 
                           onClick={() => setEditingUser(account)}
                           className="text-white hover:bg-white/10"
-                          title="User Settings"
                         >
                           <Settings className="h-4 w-4" />
                         </Button>
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          onClick={() => toggleAdminPrivilege(account.id, account.institutionalEmail)}
-                          className={isAdmin ? "text-primary hover:bg-primary/10" : "text-white/40 hover:bg-white/10"}
-                          title={isAdmin ? "Revoke Admin Privilege" : "Make Administrator"}
-                        >
-                          {isAdmin ? <ShieldMinus className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
                           onClick={() => toggleStatus(account.id, account.accountStatus)}
                           className={account.accountStatus === 'active' ? "text-yellow-500 hover:bg-yellow-500/10" : "text-green-500 hover:bg-green-500/10"}
-                          title={account.accountStatus === 'active' ? "Block User" : "Unblock User"}
                         >
                           {account.accountStatus === 'active' ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
                         </Button>
@@ -268,37 +266,34 @@ export default function AccountManagementPage() {
         <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
           <DialogContent className="bg-card border-white/10 text-white sm:max-w-[500px]">
             <DialogHeader>
-              <DialogTitle className="text-2xl font-bold font-headline">User Settings</DialogTitle>
-              <p className="text-sm text-muted-foreground">Modify profile details for {editingUser?.fullName}</p>
+              <DialogTitle className="text-2xl font-bold font-headline">Account Settings</DialogTitle>
             </DialogHeader>
             {editingUser && (
-              <form onSubmit={handleUpdateUser} className="space-y-4 py-4">
+              <form onSubmit={handleUpdateUser} className="space-y-6 py-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-name">Full Name</Label>
+                  <div className="space-y-2 col-span-2">
+                    <Label>Full Name</Label>
                     <Input 
-                      id="edit-name" 
                       value={editingUser.fullName} 
                       onChange={(e) => setEditingUser({...editingUser, fullName: e.target.value})}
-                      className="bg-black/20 border-white/10 text-white"
+                      className="bg-black/20 border-white/10"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="edit-id">ID Number</Label>
+                    <Label>ID Number</Label>
                     <Input 
-                      id="edit-id" 
                       value={editingUser.idNumber} 
                       onChange={(e) => setEditingUser({...editingUser, idNumber: e.target.value})}
-                      className="bg-black/20 border-white/10 text-white"
+                      className="bg-black/20 border-white/10"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="edit-role">Role</Label>
+                    <Label>Role</Label>
                     <Select 
                       value={editingUser.role} 
                       onValueChange={(v) => setEditingUser({...editingUser, role: v})}
                     >
-                      <SelectTrigger className="bg-black/20 border-white/10 text-white">
+                      <SelectTrigger className="bg-black/20 border-white/10">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -308,33 +303,46 @@ export default function AccountManagementPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-college">College</Label>
+                  <div className="space-y-2 col-span-2">
+                    <Label>College</Label>
                     <Input 
-                      id="edit-college" 
                       value={editingUser.college} 
                       onChange={(e) => setEditingUser({...editingUser, college: e.target.value})}
-                      className="bg-black/20 border-white/10 text-white"
-                    />
-                  </div>
-                  <div className="space-y-2 col-span-2">
-                    <Label htmlFor="edit-program">Program</Label>
-                    <Input 
-                      id="edit-program" 
-                      value={editingUser.program || ''} 
-                      onChange={(e) => setEditingUser({...editingUser, program: e.target.value})}
-                      className="bg-black/20 border-white/10 text-white"
+                      className="bg-black/20 border-white/10"
                     />
                   </div>
                 </div>
-                <DialogFooter className="pt-6">
-                  <Button type="button" variant="ghost" onClick={() => setEditingUser(null)} className="text-white hover:bg-white/5">
-                    Cancel
+
+                <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-bold">Administrator Privileges</Label>
+                    <p className="text-xs text-muted-foreground">Grant full access to dashboard and logs</p>
+                  </div>
+                  <Switch 
+                    checked={adminUids.has(editingUser.id)} 
+                    onCheckedChange={(checked) => handleToggleAdmin(editingUser.id, editingUser.institutionalEmail, !checked)}
+                  />
+                </div>
+
+                <DialogFooter className="flex flex-col sm:flex-row gap-2">
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    onClick={() => handleDeleteUser(editingUser.id)}
+                    className="text-destructive hover:bg-destructive/10 order-last sm:order-first"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Account
                   </Button>
-                  <Button type="submit" className="gap-2">
-                    <Save className="h-4 w-4" />
-                    Save Changes
-                  </Button>
+                  <div className="flex gap-2 flex-1 justify-end">
+                    <Button type="button" variant="ghost" onClick={() => setEditingUser(null)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="gap-2">
+                      <Save className="h-4 w-4" />
+                      Save
+                    </Button>
+                  </div>
                 </DialogFooter>
               </form>
             )}

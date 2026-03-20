@@ -30,7 +30,6 @@ export default function RegisterPage() {
     idNumber: '',
     role: 'Student',
     college: '',
-    program: '',
   });
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -58,11 +57,10 @@ export default function RegisterPage() {
         idNumber: formData.idNumber,
         role: formData.role,
         college: formData.college,
-        program: formData.program,
         accountStatus: 'active',
       });
 
-      // 3. Grant Admin Role (for the prototype, users registering via this page are granted admin status)
+      // 3. Grant Admin Role by default for registration through this portal
       await setDoc(doc(db, 'roles_admin', user.uid), {
         email: formData.email,
         assignedAt: new Date().toISOString()
@@ -70,10 +68,10 @@ export default function RegisterPage() {
 
       toast({
         title: "Account Created",
-        description: "Your NEU institutional account and admin privileges have been registered successfully.",
+        description: "User profile and admin privileges have been registered successfully.",
       });
       
-      router.push('/admin/dashboard');
+      router.push('/admin/accounts');
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -88,9 +86,9 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center neu-gradient p-4 py-12">
       <div className="absolute top-8 left-8">
-        <Button variant="ghost" onClick={() => router.push('/admin/login')} className="text-white/70">
+        <Button variant="ghost" onClick={() => router.push('/admin/accounts')} className="text-white/70">
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Login
+          Back to Accounts
         </Button>
       </div>
 
@@ -99,9 +97,9 @@ export default function RegisterPage() {
           <div className="flex justify-center mb-4">
             <Logo className="w-16 h-16" />
           </div>
-          <CardTitle className="text-3xl font-bold text-white font-headline">Register Admin Account</CardTitle>
+          <CardTitle className="text-3xl font-bold text-white font-headline">Add New User Profile</CardTitle>
           <CardDescription className="text-white/60">
-            Create your official library administrator profile
+            Create an official account for a student, faculty, or staff member
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -142,7 +140,7 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-white/80">Password</Label>
+                <Label className="text-white/80">Initial Password</Label>
                 <Input
                   type="password"
                   required
@@ -197,15 +195,6 @@ export default function RegisterPage() {
               )}
             </Button>
           </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-sm text-white/60">
-              Already have an account?{' '}
-              <Link href="/admin/login" className="text-primary hover:underline font-bold">
-                Login here
-              </Link>
-            </p>
-          </div>
         </CardContent>
       </Card>
     </div>

@@ -43,7 +43,7 @@ export default function VisitPage() {
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        setError("Institutional email not found. Please register your account first.");
+        setError("Institutional email not found. Please verify your email or register with the administrator.");
         setIsSubmitting(false);
         return;
       }
@@ -67,7 +67,7 @@ export default function VisitPage() {
       const visitLogsRef = collection(db, 'visitLogs');
       addDocumentNonBlocking(visitLogsRef, {
         visitorId: userProfile.id,
-        entryTime: new Date().toISOString(), // Using ISO string as per backend.json format
+        entryTime: new Date().toISOString(),
         purpose: selectedPurpose,
         otherPurposeDetails: otherDescription || null,
         categorizedPurpose: finalCategorizedPurpose,
@@ -75,7 +75,6 @@ export default function VisitPage() {
         visitorFullName: userProfile.fullName,
         visitorIdNumber: userProfile.idNumber,
         visitorRole: userProfile.role,
-        visitorProgram: userProfile.program || null,
         visitorCollege: userProfile.college,
         visitorEmail: userProfile.institutionalEmail,
         createdAt: serverTimestamp(),
@@ -140,11 +139,6 @@ export default function VisitPage() {
             <AlertTitle>Action Required</AlertTitle>
             <AlertDescription className="flex flex-col gap-2">
               {error}
-              {error.includes("not found") && (
-                <Button variant="link" onClick={() => router.push('/admin/register')} className="text-destructive font-bold p-0 h-auto w-fit">
-                  Register here
-                </Button>
-              )}
             </AlertDescription>
           </Alert>
         )}
