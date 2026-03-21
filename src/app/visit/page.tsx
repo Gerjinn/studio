@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState } from 'react';
@@ -237,9 +236,6 @@ export default function VisitPage() {
                 required
                 className="bg-card border-border/50"
               />
-              <p className="text-xs text-muted-foreground italic flex items-center gap-1">
-                <Loader2 className="h-3 w-3 animate-spin" /> AI will help categorize your entry for better statistics.
-              </p>
             </div>
           )}
 
