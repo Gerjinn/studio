@@ -14,7 +14,8 @@ import {
   CalendarDays,
   ChevronRight,
   Info,
-  CheckCircle2
+  CheckCircle2,
+  X
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -81,8 +82,8 @@ export default function DashboardPage() {
     if (user && sessionStorage.getItem('just_logged_in') === 'true') {
       setShowWelcome(true);
       sessionStorage.removeItem('just_logged_in');
-      // Set to 1.5 seconds as requested
-      const timer = setTimeout(() => setShowWelcome(false), 1500);
+      // Set to 2 seconds as requested
+      const timer = setTimeout(() => setShowWelcome(false), 2000);
       return () => clearTimeout(timer);
     }
   }, [user]);
@@ -225,10 +226,16 @@ export default function DashboardPage() {
     <div className="min-h-screen flex bg-[#1a2c38]">
       <AdminSidebar />
       <main className="flex-1 ml-72 p-8 relative">
-        {/* Centered Welcome Greeting Overlay - Reduced to 1.5s */}
+        {/* Centered Welcome Greeting Overlay - Updated to 2s with close button */}
         {showWelcome && user && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none px-4">
-            <div className="bg-card/95 backdrop-blur-2xl p-10 rounded-2xl border border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.5)] text-center animate-in zoom-in fade-in duration-300 max-w-sm w-full">
+            <div className="bg-card/95 backdrop-blur-2xl p-10 rounded-2xl border border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.5)] text-center animate-in zoom-in fade-in duration-300 max-w-sm w-full pointer-events-auto relative">
+              <button 
+                onClick={() => setShowWelcome(false)}
+                className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
               <div className="flex justify-center mb-4">
                 <div className="rounded-full bg-primary/20 p-4 animate-bounce">
                   <CheckCircle2 className="h-12 w-12 text-primary" />
