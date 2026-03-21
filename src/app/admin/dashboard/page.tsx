@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useMemo, useEffect, useState } from 'react';
@@ -11,7 +10,8 @@ import {
   Download, 
   TrendingUp, 
   Loader2,
-  CalendarDays
+  CalendarDays,
+  ChevronRight
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -34,7 +34,7 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { format, isToday, isThisWeek, isThisMonth, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { format, isToday, isThisWeek, isThisMonth, parseISO, isWithinInterval, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
+import { cn } from '@/lib/utils';
 
 export default function DashboardPage() {
   const db = useFirestore();
@@ -59,6 +60,9 @@ export default function DashboardPage() {
     from: undefined,
     to: undefined,
   });
+
+  // Track if a specific quick filter is active for UI highlighting
+  const [activeFilter, setActiveFilter] = useState<'today' | 'week' | 'month' | null>(null);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -73,7 +77,7 @@ export default function DashboardPage() {
 
   const { data: visits, isLoading: isLogsLoading } = useCollection(visitsQuery);
 
-  // Global absolute stats (Today, Week, Month) - always visible
+  // Global absolute stats (Today, Week, Month) - used for card numbers
   const absoluteStats = useMemo(() => {
     if (!visits) return { today: 0, week: 0, month: 0 };
     
@@ -133,9 +137,11 @@ export default function DashboardPage() {
     })).filter(d => d.value > 0);
   }, [filteredVisitsByRange]);
 
-  const recentVisits = useMemo(() => {
-    return filteredVisitsByRange.slice(0, 10);
-  }, [filteredVisitsByRange]);
+  // Table at the bottom: show filtered results (limit to 50 if filtered, 10 if not)
+  const displayVisits = useMemo(() => {
+    if (!dateRange?.from) return filteredVisitsByRange.slice(0, 10);
+    return filteredVisitsByRange.slice(0, 50);
+  }, [filteredVisitsByRange, dateRange]);
 
   const handleExport = () => {
     if (!filteredVisitsByRange || filteredVisitsByRange.length === 0) {
@@ -167,6 +173,27 @@ export default function DashboardPage() {
       title: "Report Exported",
       description: "Dashboard data has been exported to Excel.",
     });
+  };
+
+  const setTodayFilter = () => {
+    const today = new Date();
+    setDateRange({ from: today, to: today });
+    setActiveFilter('today');
+  };
+
+  const setThisWeekFilter = () => {
+    setDateRange({ from: startOfWeek(new Date()), to: endOfWeek(new Date()) });
+    setActiveFilter('week');
+  };
+
+  const setThisMonthFilter = () => {
+    setDateRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) });
+    setActiveFilter('month');
+  };
+
+  const resetFilters = () => {
+    setDateRange({ from: undefined, to: undefined });
+    setActiveFilter(null);
   };
 
   if (isUserLoading || (user && isLogsLoading)) {
@@ -215,7 +242,10 @@ export default function DashboardPage() {
                     mode="range"
                     defaultMonth={dateRange?.from}
                     selected={dateRange}
-                    onSelect={setDateRange}
+                    onSelect={(range) => {
+                      setDateRange(range);
+                      setActiveFilter(null);
+                    }}
                     numberOfMonths={2}
                     className="rounded-md border-none"
                   />
@@ -224,7 +254,7 @@ export default function DashboardPage() {
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        onClick={() => setDateRange({ from: undefined, to: undefined })}
+                        onClick={resetFilters}
                         className="text-xs text-primary hover:bg-primary/10"
                       >
                         Reset Range
@@ -243,11 +273,18 @@ export default function DashboardPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {[
-            { label: 'Total Visitors Today', value: absoluteStats.today.toString(), icon: Users },
-            { label: 'This Week', value: absoluteStats.week.toString(), icon: TrendingUp },
-            { label: 'This Month', value: absoluteStats.month.toString(), icon: CalendarIcon },
+            { label: 'Total Visitors Today', value: absoluteStats.today.toString(), icon: Users, filter: 'today', action: setTodayFilter },
+            { label: 'This Week', value: absoluteStats.week.toString(), icon: TrendingUp, filter: 'week', action: setThisWeekFilter },
+            { label: 'This Month', value: absoluteStats.month.toString(), icon: CalendarIcon, filter: 'month', action: setThisMonthFilter },
           ].map((stat, i) => (
-            <Card key={i} className="bg-card/30 border-white/5 backdrop-blur-md overflow-hidden relative group">
+            <Card 
+              key={i} 
+              onClick={stat.action}
+              className={cn(
+                "bg-card/30 border-white/5 backdrop-blur-md overflow-hidden relative group cursor-pointer transition-all hover:bg-card/50",
+                activeFilter === stat.filter && "ring-2 ring-primary border-transparent bg-card/60"
+              )}
+            >
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                 <stat.icon className="h-20 w-20 text-white" />
               </div>
@@ -257,6 +294,7 @@ export default function DashboardPage() {
               <CardContent>
                 <div className="flex items-end justify-between">
                   <h3 className="text-4xl font-black text-white">{stat.value}</h3>
+                  <ChevronRight className={cn("h-5 w-5 text-white/20 transition-transform group-hover:translate-x-1 group-hover:text-primary", activeFilter === stat.filter && "text-primary opacity-100")} />
                 </div>
               </CardContent>
             </Card>
@@ -339,9 +377,20 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        <Card className="bg-card/30 border-white/5">
-          <CardHeader>
-            <CardTitle className="text-lg font-bold">Entries in Selected Period</CardTitle>
+        <Card className="bg-card/30 border-white/5" id="visitor-list">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg font-bold">
+              {activeFilter === 'today' && "Visitors Today"}
+              {activeFilter === 'week' && "Visitors This Week"}
+              {activeFilter === 'month' && "Visitors This Month"}
+              {!activeFilter && dateRange?.from && "Visitors in Selected Range"}
+              {!activeFilter && !dateRange?.from && "Recent Visitor Entries"}
+            </CardTitle>
+            {activeFilter || dateRange?.from ? (
+              <Button variant="ghost" size="sm" onClick={resetFilters} className="text-xs text-primary">
+                Clear Filters
+              </Button>
+            ) : null}
           </CardHeader>
           <CardContent>
             <Table>
@@ -353,8 +402,8 @@ export default function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentVisits.length > 0 ? (
-                  recentVisits.map((v) => (
+                {displayVisits.length > 0 ? (
+                  displayVisits.map((v) => (
                     <TableRow key={v.id} className="border-white/5">
                       <TableCell className="text-white font-medium">{v.visitorFullName}</TableCell>
                       <TableCell>
@@ -369,12 +418,19 @@ export default function DashboardPage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={3} className="text-center py-10 text-muted-foreground">
-                      No entries found for the selected date range.
+                      No entries found for the selected period.
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
+            {!activeFilter && !dateRange?.from && displayVisits.length >= 10 && (
+              <div className="mt-4 text-center">
+                <Button variant="ghost" className="text-xs text-muted-foreground" onClick={() => router.push('/admin/logs')}>
+                  View All Historical Logs
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>
