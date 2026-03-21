@@ -11,7 +11,8 @@ import {
   TrendingUp, 
   Loader2,
   CalendarDays,
-  ChevronRight
+  ChevronRight,
+  Info
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -412,7 +413,30 @@ export default function DashboardPage() {
                           <span className="text-[10px] text-muted-foreground">{v.entryTime ? format(parseISO(v.entryTime), 'MMMM d, yyyy') : ''}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-primary font-bold">{v.categorizedPurpose || v.purpose}</TableCell>
+                      <TableCell className="text-primary font-bold">
+                        <div className="flex items-center gap-2">
+                          <span>{v.categorizedPurpose || v.purpose}</span>
+                          {v.purpose === 'Other' && v.otherPurposeDetails && (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-4 w-4 p-0 text-white/40 hover:text-primary transition-colors">
+                                  <ChevronRight className="h-4 w-4" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64 bg-card border-white/10 shadow-xl z-[100]">
+                                <div className="space-y-1">
+                                  <p className="text-[10px] font-bold text-primary uppercase tracking-wider flex items-center gap-1">
+                                    <Info className="h-3 w-3" /> Visitor's Description:
+                                  </p>
+                                  <p className="text-sm text-white font-medium leading-tight">
+                                    {v.otherPurposeDetails}
+                                  </p>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          )}
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
