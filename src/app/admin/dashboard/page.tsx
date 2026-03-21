@@ -288,7 +288,9 @@ export default function DashboardPage() {
                     />
                     <Tooltip 
                       cursor={{fill: 'rgba(255,255,255,0.05)'}}
-                      contentStyle={{backgroundColor: '#233c4b', border: 'none', borderRadius: '8px'}}
+                      contentStyle={{backgroundColor: '#233c4b', border: 'none', borderRadius: '8px', color: '#fff'}}
+                      itemStyle={{color: '#fff'}}
+                      labelStyle={{color: '#fff'}}
                     />
                     <Bar dataKey="visitors" radius={[0, 4, 4, 0]}>
                       {collegeChartData.map((entry, index) => (
@@ -326,7 +328,9 @@ export default function DashboardPage() {
                       ))}
                     </Pie>
                     <Tooltip 
-                      contentStyle={{backgroundColor: '#233c4b', border: 'none', borderRadius: '8px'}}
+                      contentStyle={{backgroundColor: '#233c4b', border: 'none', borderRadius: '8px', color: '#fff'}}
+                      itemStyle={{color: '#fff'}}
+                      labelStyle={{color: '#fff'}}
                     />
                   </PieChart>
                 </ResponsiveContainer>
