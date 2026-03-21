@@ -132,7 +132,7 @@ export default function RegisterPage() {
                 <Label className="text-white/80">Full Name</Label>
                 <Input
                   required
-                  placeholder="John Doe"
+                  placeholder="Your Name"
                   value={formData.fullName}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                   className="bg-black/20 border-white/10 text-white h-12"
@@ -152,10 +152,10 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-white/80">ID Number</Label>
+                <Label className="text-white/80">ID/Student Number</Label>
                 <Input
                   required
-                  placeholder="2023-XXXX"
+                  placeholder="2023-XXXX/21-13514-XX"
                   value={formData.idNumber}
                   onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })}
                   className="bg-black/20 border-white/10 text-white h-12"
