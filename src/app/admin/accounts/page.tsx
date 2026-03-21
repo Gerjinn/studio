@@ -18,8 +18,7 @@ import {
   Save,
   Trash2,
   Filter,
-  AlertTriangle,
-  X
+  AlertTriangle
 } from 'lucide-react';
 import { 
   Table, 
@@ -98,11 +97,15 @@ export default function AccountManagementPage() {
       const name = acc.fullName || '';
       const idNum = acc.idNumber || '';
       const email = acc.institutionalEmail || '';
+      const role = acc.role || '';
+      const college = acc.college || '';
       
       const matchesSearch = 
         name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         idNum.includes(searchTerm) ||
-        email.toLowerCase().includes(searchTerm.toLowerCase());
+        email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        role.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        college.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesRole = roleFilter === 'all' || acc.role === roleFilter;
       const matchesCollege = collegeFilter === 'all' || acc.college === collegeFilter;
@@ -225,7 +228,7 @@ export default function AccountManagementPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
-              placeholder="Search by name, ID, or email..." 
+              placeholder="Search by name, ID, email, role, or college..." 
               className="pl-9 bg-card border-white/10"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}

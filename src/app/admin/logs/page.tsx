@@ -71,7 +71,10 @@ export default function VisitorLogPage() {
       const matchesSearch = 
         v.visitorFullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         v.visitorIdNumber?.includes(searchTerm) ||
-        v.visitorEmail?.toLowerCase().includes(searchTerm.toLowerCase());
+        v.visitorEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        v.visitorRole?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        v.visitorCollege?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (v.categorizedPurpose || v.purpose)?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesRole = roleFilter === 'all' || v.visitorRole === roleFilter;
       const matchesCollege = collegeFilter === 'all' || v.visitorCollege === collegeFilter;
@@ -155,7 +158,7 @@ export default function VisitorLogPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
-                  placeholder="Search Name, ID, or Email..." 
+                  placeholder="Search Name, ID, Email, Role, College, or Purpose..." 
                   className="pl-9 bg-card border-white/10 text-white"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
