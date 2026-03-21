@@ -43,9 +43,9 @@ export default function VisitPage() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      if (!user.email?.endsWith('@neu.edu.ph')) {
+      if (!user.email?.toLowerCase().endsWith('@neu.edu.ph')) {
         await signOut(auth);
-        setError("Only @neu.edu.ph institutional Google accounts are permitted.");
+        setError("Only @neu.edu.ph institutional Google accounts are permitted. Please visit the help desk/admin for assistance.");
         return;
       }
 
@@ -58,14 +58,14 @@ export default function VisitPage() {
 
       if (querySnapshot.empty) {
         await signOut(auth);
-        setError("Your institutional account is authenticated, but no visitor profile was found. Please register with the library staff.");
+        setError("No visitor profile was found for this account. Please visit the help desk/admin for assistance.");
         return;
       }
 
       const userProfile = querySnapshot.docs[0].data();
       if (userProfile.accountStatus === 'blocked') {
         await signOut(auth);
-        setError("ACCESS DENIED: Your library privileges have been suspended. Please contact the administrator.");
+        setError("ACCESS DENIED: Your library privileges have been suspended. Please visit the help desk/admin for assistance.");
         return;
       }
 
@@ -106,7 +106,7 @@ export default function VisitPage() {
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        setError("Institutional email not found. Please verify your email or register with the administrator.");
+        setError("Institutional email not found. Please visit the help desk/admin for assistance.");
         setIsSubmitting(false);
         return;
       }
@@ -115,7 +115,7 @@ export default function VisitPage() {
       
       // CRITICAL: Strict block enforcement
       if (userProfile.accountStatus === 'blocked') {
-        setError("Your account is currently BLOCKED from library entry. Please visit the help desk for assistance.");
+        setError("Your account is currently BLOCKED from library entry. Please visit the help desk/admin for assistance.");
         setIsSubmitting(false);
         return;
       }
@@ -284,7 +284,7 @@ export default function VisitPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="h-14 text-lg bg-card border-border/50"
                 />
-                {!email.includes('@neu.edu.ph') && email.length > 5 && (
+                {!email.toLowerCase().includes('@neu.edu.ph') && email.length > 5 && (
                   <p className="text-destructive text-sm font-medium">Only NEU institutional emails are accepted.</p>
                 )}
               </div>
@@ -294,7 +294,7 @@ export default function VisitPage() {
               type="submit" 
               size="lg" 
               className="w-full h-16 text-xl font-bold shadow-lg shadow-primary/20"
-              disabled={!selectedPurpose || !email.includes('@neu.edu.ph') || isSubmitting}
+              disabled={!selectedPurpose || !email.toLowerCase().includes('@neu.edu.ph') || isSubmitting}
             >
               {isSubmitting ? (
                 <>
