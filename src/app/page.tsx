@@ -12,7 +12,7 @@ export default function WelcomePage() {
           Welcome to <span className="text-primary">NEU Library!</span>
         </h1>
         <p className="mt-4 text-xl text-muted-foreground max-w-lg">
-          Official Library Visitor Log of New Era University. Please sign in to log your visit.
+          Library Visitor Log of New Era University. Please sign in to log your visit.
         </p>
       </div>
 
