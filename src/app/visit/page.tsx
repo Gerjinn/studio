@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from 'react';
@@ -11,8 +12,8 @@ import { CheckCircle2, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { categorizeVisitPurpose } from '@/ai/flows/ai-purpose-categorization-flow';
 import { Textarea } from '@/components/ui/textarea';
-import { useFirestore, useAuth, addDocumentNonBlocking } from '@/firebase';
-import { collection, query, where, getDocs, limit, serverTimestamp } from 'firebase/firestore';
+import { useFirestore, useAuth, addDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
+import { collection, query, where, getDocs, limit, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -32,6 +33,13 @@ export default function VisitPage() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Enhanced Google Sign In:
+   * 1. Authenticates user.
+   * 2. Verifies institutional domain (@neu.edu.ph).
+   * 3. Auto-provisions a UserProfile if one doesn't exist (Zero-Admin hurdle).
+   * 4. Enforces block status if profile exists.
+   */
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     setError(null);
@@ -50,28 +58,41 @@ export default function VisitPage() {
 
       const normalizedEmail = user.email.toLowerCase();
       
-      // Verification check immediately after Google login
-      const profilesRef = collection(db, 'userProfiles');
-      const q = query(profilesRef, where('institutionalEmail', '==', normalizedEmail), limit(1));
-      const querySnapshot = await getDocs(q);
+      // Check for existing profile
+      const profileRef = doc(db, 'userProfiles', user.uid);
+      const profileSnap = await getDoc(profileRef);
 
-      if (querySnapshot.empty) {
-        await signOut(auth);
-        setError("No visitor profile was found for this account. Please visit the help desk/admin for assistance.");
-        return;
-      }
-
-      const userProfile = querySnapshot.docs[0].data();
-      if (userProfile.accountStatus === 'blocked') {
-        await signOut(auth);
-        setError("ACCESS DENIED: Your library privileges have been suspended. Please visit the help desk/admin for assistance.");
-        return;
+      if (!profileSnap.exists()) {
+        // Auto-provision profile for valid institutional user
+        // This removes the need for manual admin registration for Google users
+        await setDoc(profileRef, {
+          id: user.uid,
+          institutionalEmail: normalizedEmail,
+          fullName: user.displayName || 'NEU Visitor',
+          idNumber: 'AUTO-PROVISIONED',
+          role: 'Student', // Default role
+          college: 'Unassigned', // Default college
+          accountStatus: 'active',
+          createdAt: new Date().toISOString()
+        });
+        
+        toast({
+          title: "Profile Initialized",
+          description: "Your institutional visitor profile has been automatically created.",
+        });
+      } else {
+        const userProfile = profileSnap.data();
+        if (userProfile.accountStatus === 'blocked') {
+          await signOut(auth);
+          setError("ACCESS DENIED: Your library privileges have been suspended. Please visit the help desk/admin for assistance.");
+          return;
+        }
       }
 
       setEmail(normalizedEmail);
       toast({
         title: "Authenticated",
-        description: `Welcome back, ${user.displayName}. Please select your purpose and submit.`,
+        description: `Welcome, ${user.displayName}. Please select your purpose and submit.`,
       });
     } catch (err: any) {
       if (err.code !== 'auth/popup-closed-by-user') {
@@ -99,39 +120,38 @@ export default function VisitPage() {
     setIsSubmitting(true);
 
     try {
-      // 1. Find User Profile by Email
+      // Find User Profile by Email
       const profilesRef = collection(db, 'userProfiles');
       const q = query(profilesRef, where('institutionalEmail', '==', normalizedEmail), limit(1));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        setError("Institutional email not found. Please visit the help desk/admin for assistance.");
+        setError("Visitor profile not found. If using manual entry, an admin must register your account first. Try 'Quick Login with Google' for automatic entry.");
         setIsSubmitting(false);
         return;
       }
 
       const userProfile = querySnapshot.docs[0].data();
       
-      // CRITICAL: Strict block enforcement
+      // Strict block enforcement
       if (userProfile.accountStatus === 'blocked') {
         setError("Your account is currently BLOCKED from library entry. Please visit the help desk/admin for assistance.");
         setIsSubmitting(false);
         return;
       }
 
-      // 2. AI Categorization if "Other"
+      // AI Categorization if "Other"
       let finalCategorizedPurpose = selectedPurpose;
       if (selectedPurpose === 'Other' && otherDescription) {
         try {
           const aiResult = await categorizeVisitPurpose({ otherPurposeDescription: otherDescription });
           finalCategorizedPurpose = aiResult.categorizedPurpose;
         } catch (err) {
-          // Robust fallback: if AI fails (e.g. quota limit), use the original selection
           finalCategorizedPurpose = selectedPurpose;
         }
       }
       
-      // 3. Log Visit
+      // Log Visit
       const visitLogsRef = collection(db, 'visitLogs');
       addDocumentNonBlocking(visitLogsRef, {
         visitorId: userProfile.id,
@@ -139,7 +159,6 @@ export default function VisitPage() {
         purpose: selectedPurpose,
         otherPurposeDetails: otherDescription || null,
         categorizedPurpose: finalCategorizedPurpose,
-        // Denormalized fields for Admin efficiency
         visitorFullName: userProfile.fullName,
         visitorIdNumber: userProfile.idNumber,
         visitorRole: userProfile.role,
@@ -153,7 +172,6 @@ export default function VisitPage() {
         router.push('/');
       }, 3000);
     } catch (err: any) {
-      console.error(err);
       toast({
         variant: "destructive",
         title: "Submission Error",
