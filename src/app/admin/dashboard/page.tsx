@@ -1,16 +1,17 @@
 
 "use client"
 
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { AdminSidebar } from '@/components/admin/Sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
   Users, 
-  Calendar, 
+  Calendar as CalendarIcon, 
   Download, 
   TrendingUp, 
-  Loader2
+  Loader2,
+  CalendarDays
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -33,12 +34,19 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { format, isToday, isThisWeek, isThisMonth, parseISO } from 'date-fns';
+import { format, isToday, isThisWeek, isThisMonth, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { exportToExcel } from '@/lib/export-utils';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { DateRange } from "react-day-picker";
 
 export default function DashboardPage() {
   const db = useFirestore();
@@ -46,6 +54,12 @@ export default function DashboardPage() {
   const router = useRouter();
   const { toast } = useToast();
   
+  // State for date range filtering
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: undefined,
+    to: undefined,
+  });
+
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/admin/login');
@@ -59,7 +73,8 @@ export default function DashboardPage() {
 
   const { data: visits, isLoading: isLogsLoading } = useCollection(visitsQuery);
 
-  const stats = useMemo(() => {
+  // Global absolute stats (Today, Week, Month) - always visible
+  const absoluteStats = useMemo(() => {
     if (!visits) return { today: 0, week: 0, month: 0 };
     
     return visits.reduce((acc, visit) => {
@@ -73,10 +88,27 @@ export default function DashboardPage() {
     }, { today: 0, week: 0, month: 0 });
   }, [visits]);
 
-  const collegeChartData = useMemo(() => {
+  // Filtered visits based on the selected date range
+  const filteredVisitsByRange = useMemo(() => {
     if (!visits) return [];
+    if (!dateRange?.from) return visits;
+
+    return visits.filter(visit => {
+      try {
+        const visitDate = parseISO(visit.entryTime);
+        const start = startOfDay(dateRange.from!);
+        const end = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from!);
+        
+        return isWithinInterval(visitDate, { start, end });
+      } catch (e) {
+        return false;
+      }
+    });
+  }, [visits, dateRange]);
+
+  const collegeChartData = useMemo(() => {
     const counts: Record<string, number> = {};
-    visits.forEach(v => {
+    filteredVisitsByRange.forEach(v => {
       if (v.visitorCollege) {
         counts[v.visitorCollege] = (counts[v.visitorCollege] || 0) + 1;
       }
@@ -86,12 +118,11 @@ export default function DashboardPage() {
       visitors: counts[college] || 0,
       fill: `hsl(var(--chart-${(idx % 5) + 1}))`
     })).sort((a, b) => b.visitors - a.visitors);
-  }, [visits]);
+  }, [filteredVisitsByRange]);
 
   const purposeChartData = useMemo(() => {
-    if (!visits) return [];
     const counts: Record<string, number> = {};
-    visits.forEach(v => {
+    filteredVisitsByRange.forEach(v => {
       const p = v.categorizedPurpose || v.purpose;
       if (p) counts[p] = (counts[p] || 0) + 1;
     });
@@ -100,23 +131,23 @@ export default function DashboardPage() {
       value: counts[purpose] || 0,
       fill: `hsl(var(--chart-${(idx % 5) + 1}))`
     })).filter(d => d.value > 0);
-  }, [visits]);
+  }, [filteredVisitsByRange]);
 
   const recentVisits = useMemo(() => {
-    return visits?.slice(0, 10) || [];
-  }, [visits]);
+    return filteredVisitsByRange.slice(0, 10);
+  }, [filteredVisitsByRange]);
 
   const handleExport = () => {
-    if (!visits || visits.length === 0) {
+    if (!filteredVisitsByRange || filteredVisitsByRange.length === 0) {
       toast({
         variant: "destructive",
         title: "Export Error",
-        description: "No visit logs available to export.",
+        description: "No visit logs available for the selected period.",
       });
       return;
     }
 
-    const exportData = visits.map(v => ({
+    const exportData = filteredVisitsByRange.map(v => ({
       'Visitor Name': v.visitorFullName,
       'ID Number': v.visitorIdNumber,
       'Email': v.visitorEmail,
@@ -126,7 +157,11 @@ export default function DashboardPage() {
       'Entry Time': v.entryTime ? format(parseISO(v.entryTime), 'MMMM d, yyyy h:mm a') : 'N/A',
     }));
 
-    exportToExcel(exportData, `NEU_Library_Report_${format(new Date(), 'yyyy-MM-dd')}`);
+    const dateStr = dateRange?.from 
+      ? `_${format(dateRange.from, 'yyyyMMdd')}${dateRange.to ? `_to_${format(dateRange.to, 'yyyyMMdd')}` : ''}`
+      : `_${format(new Date(), 'yyyyMMdd')}`;
+
+    exportToExcel(exportData, `NEU_Library_Report${dateStr}`);
     
     toast({
       title: "Report Exported",
@@ -149,14 +184,57 @@ export default function DashboardPage() {
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold font-headline text-white">Dashboard Overview</h1>
-            <p className="text-muted-foreground">Live insights for NEU Library Staff.</p>
+            <p className="text-muted-foreground">
+              {dateRange?.from 
+                ? `Showing insights for ${format(dateRange.from, 'MMM dd, yyyy')} ${dateRange.to ? ` - ${format(dateRange.to, 'MMM dd, yyyy')}` : ''}`
+                : "Live insights for NEU Library Staff."}
+            </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="bg-card border-border/50 text-white gap-2">
-              <Calendar className="h-4 w-4" />
-              {format(new Date(), 'MMMM d, yyyy')}
-            </Button>
-            <Button onClick={handleExport} className="gap-2 shadow-lg shadow-primary/20">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="bg-card border-border/50 text-white gap-2 h-10">
+                  <CalendarDays className="h-4 w-4" />
+                  {dateRange?.from ? (
+                    dateRange.to ? (
+                      <>
+                        {format(dateRange.from, "MMM dd")} - {format(dateRange.to, "MMM dd")}
+                      </>
+                    ) : (
+                      format(dateRange.from, "MMM dd, yyyy")
+                    )
+                  ) : (
+                    "Select Date Range"
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <div className="bg-card border border-white/10 rounded-lg shadow-2xl">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={dateRange?.from}
+                    selected={dateRange}
+                    onSelect={setDateRange}
+                    numberOfMonths={2}
+                    className="rounded-md border-none"
+                  />
+                  {dateRange?.from && (
+                    <div className="p-3 border-t border-white/5 flex justify-end">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setDateRange({ from: undefined, to: undefined })}
+                        className="text-xs text-primary hover:bg-primary/10"
+                      >
+                        Reset Range
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Button onClick={handleExport} className="gap-2 shadow-lg shadow-primary/20 h-10">
               <Download className="h-4 w-4" />
               Export Excel
             </Button>
@@ -165,9 +243,9 @@ export default function DashboardPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {[
-            { label: 'Total Visitors Today', value: stats.today.toString(), icon: Users },
-            { label: 'This Week', value: stats.week.toString(), icon: TrendingUp },
-            { label: 'This Month', value: stats.month.toString(), icon: Calendar },
+            { label: 'Total Visitors Today', value: absoluteStats.today.toString(), icon: Users },
+            { label: 'This Week', value: absoluteStats.week.toString(), icon: TrendingUp },
+            { label: 'This Month', value: absoluteStats.month.toString(), icon: CalendarIcon },
           ].map((stat, i) => (
             <Card key={i} className="bg-card/30 border-white/5 backdrop-blur-md overflow-hidden relative group">
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -190,7 +268,7 @@ export default function DashboardPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-lg font-bold">Visitors by College</CardTitle>
-                <p className="text-xs text-muted-foreground">Distribution of library users</p>
+                <p className="text-xs text-muted-foreground">Distribution for the selected period</p>
               </div>
             </CardHeader>
             <CardContent>
@@ -227,7 +305,7 @@ export default function DashboardPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-lg font-bold">Visit Purposes</CardTitle>
-                <p className="text-xs text-muted-foreground">Top reasons for visiting</p>
+                <p className="text-xs text-muted-foreground">Reasons for visit in the selected period</p>
               </div>
             </CardHeader>
             <CardContent>
@@ -259,7 +337,7 @@ export default function DashboardPage() {
 
         <Card className="bg-card/30 border-white/5">
           <CardHeader>
-            <CardTitle className="text-lg font-bold">Recent Visitor Entries</CardTitle>
+            <CardTitle className="text-lg font-bold">Entries in Selected Period</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
@@ -271,18 +349,26 @@ export default function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentVisits.map((v) => (
-                  <TableRow key={v.id} className="border-white/5">
-                    <TableCell className="text-white font-medium">{v.visitorFullName}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="text-white font-medium">{v.entryTime ? format(parseISO(v.entryTime), 'h:mm a') : 'N/A'}</span>
-                        <span className="text-[10px] text-muted-foreground">{v.entryTime ? format(parseISO(v.entryTime), 'MMMM d, yyyy') : ''}</span>
-                      </div>
+                {recentVisits.length > 0 ? (
+                  recentVisits.map((v) => (
+                    <TableRow key={v.id} className="border-white/5">
+                      <TableCell className="text-white font-medium">{v.visitorFullName}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="text-white font-medium">{v.entryTime ? format(parseISO(v.entryTime), 'h:mm a') : 'N/A'}</span>
+                          <span className="text-[10px] text-muted-foreground">{v.entryTime ? format(parseISO(v.entryTime), 'MMMM d, yyyy') : ''}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-primary font-bold">{v.categorizedPurpose || v.purpose}</TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center py-10 text-muted-foreground">
+                      No entries found for the selected date range.
                     </TableCell>
-                    <TableCell className="text-primary font-bold">{v.categorizedPurpose || v.purpose}</TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </CardContent>
