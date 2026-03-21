@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState } from 'react';
@@ -8,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/Logo';
-import { ArrowLeft, Loader2, UserPlus } from 'lucide-react';
+import { ArrowLeft, Loader2, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { useFirestore } from '@/firebase';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
@@ -24,6 +23,7 @@ export default function RegisterPage() {
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -164,14 +164,25 @@ export default function RegisterPage() {
 
               <div className="space-y-2">
                 <Label className="text-white/80">Initial Password</Label>
-                <Input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="bg-black/20 border-white/10 text-white h-12"
-                />
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="bg-black/20 border-white/10 text-white h-12 pr-12"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full w-12 text-white/40 hover:text-white hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </Button>
+                </div>
               </div>
 
               <div className="space-y-2">

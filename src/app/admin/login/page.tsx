@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from 'react';
@@ -7,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/Logo';
-import { ShieldAlert, ArrowLeft, Loader2 } from 'lucide-react';
+import { ShieldAlert, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useAuth, useUser, useFirestore } from '@/firebase';
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
@@ -23,6 +22,7 @@ export default function AdminLoginPage() {
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
@@ -207,14 +207,25 @@ export default function AdminLoginPage() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium text-white/80">Password</label>
-              <Input
-                type="password"
-                placeholder="••••••••"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="bg-black/20 border-white/10 text-white h-12 focus:ring-primary"
-              />
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="bg-black/20 border-white/10 text-white h-12 pr-12 focus:ring-primary"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full w-12 text-white/40 hover:text-white hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </Button>
+              </div>
             </div>
 
             <Button 
