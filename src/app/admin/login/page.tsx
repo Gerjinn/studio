@@ -10,7 +10,7 @@ import { Logo } from '@/components/Logo';
 import { ShieldAlert, ArrowLeft, Loader2 } from 'lucide-react';
 import { useAuth, useUser, useFirestore } from '@/firebase';
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 
@@ -26,10 +26,30 @@ export default function AdminLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
-  // Verification helper
+  /**
+   * Comprehensive authorization check:
+   * 1. Checks roles_admin for staff privileges.
+   * 2. Checks userProfiles for accountStatus (Blocking logic).
+   */
   const verifyAuthorization = async (uid: string, userEmail: string | null) => {
-    if (userEmail === 'gerjinn.yallung@neu.edu.ph') return true;
+    const normalizedEmail = userEmail?.toLowerCase() || '';
     
+    // Fallback for master administrator
+    if (normalizedEmail === 'gerjinn.yallung@neu.edu.ph') return true;
+    
+    // Check if account is blocked in userProfiles
+    const profilesRef = collection(db, 'userProfiles');
+    const profileQuery = query(profilesRef, where('institutionalEmail', '==', normalizedEmail), limit(1));
+    const profileSnap = await getDocs(profileQuery);
+    
+    if (!profileSnap.empty) {
+      const profile = profileSnap.docs[0].data();
+      if (profile.accountStatus === 'blocked') {
+        return false; // Blocked accounts can't access dashboard even if they are staff
+      }
+    }
+    
+    // Check staff permissions
     const adminRef = doc(db, 'roles_admin', uid);
     const snap = await getDoc(adminRef);
     return snap.exists();
@@ -37,7 +57,9 @@ export default function AdminLoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.endsWith('@neu.edu.ph')) {
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    if (!normalizedEmail.endsWith('@neu.edu.ph')) {
       toast({
         variant: "destructive",
         title: "Access Denied",
@@ -48,15 +70,15 @@ export default function AdminLoginPage() {
 
     setIsLoading(true);
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
+      const result = await signInWithEmailAndPassword(auth, normalizedEmail, password);
       const authorized = await verifyAuthorization(result.user.uid, result.user.email);
       
       if (!authorized) {
         await signOut(auth);
         toast({
           variant: "destructive",
-          title: "Unauthorized Account",
-          description: "This account has not been granted administrative privileges.",
+          title: "Access Restricted",
+          description: "This account is either unauthorized or has been suspended by an administrator.",
         });
       } else {
         router.push('/admin/dashboard');
@@ -65,7 +87,7 @@ export default function AdminLoginPage() {
       toast({
         variant: "destructive",
         title: "Login Failed",
-        description: "Invalid credentials or unauthorized account.",
+        description: "Invalid credentials or account restriction.",
       });
     } finally {
       setIsLoading(false);
@@ -80,8 +102,9 @@ export default function AdminLoginPage() {
     try {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
+      const normalizedEmail = user.email?.toLowerCase() || '';
 
-      if (!user.email?.endsWith('@neu.edu.ph')) {
+      if (!normalizedEmail.endsWith('@neu.edu.ph')) {
         await signOut(auth);
         toast({
           variant: "destructive",
@@ -91,13 +114,13 @@ export default function AdminLoginPage() {
         return;
       }
 
-      const authorized = await verifyAuthorization(user.uid, user.email);
+      const authorized = await verifyAuthorization(user.uid, normalizedEmail);
       if (!authorized) {
         await signOut(auth);
         toast({
           variant: "destructive",
-          title: "Unauthorized Account",
-          description: "This Google account has not been added to the authorized staff list.",
+          title: "Access Restricted",
+          description: "Your dashboard access has been suspended or unauthorized.",
         });
         return;
       }

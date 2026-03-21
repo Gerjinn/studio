@@ -35,7 +35,9 @@ export default function RegisterPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.email.includes('@neu.edu.ph')) {
+    const normalizedEmail = formData.email.toLowerCase().trim();
+    
+    if (!normalizedEmail.endsWith('@neu.edu.ph')) {
       toast({
         variant: "destructive",
         title: "Invalid Domain",
@@ -62,13 +64,13 @@ export default function RegisterPage() {
 
     try {
       // 1. Create Auth User using the secondary instance
-      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, formData.email, formData.password);
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, normalizedEmail, formData.password);
       const newUser = userCredential.user;
 
       // 2. Create User Profile in Firestore using the primary db instance
       await setDoc(doc(db, 'userProfiles', newUser.uid), {
         id: newUser.uid,
-        institutionalEmail: formData.email,
+        institutionalEmail: normalizedEmail,
         fullName: formData.fullName,
         idNumber: formData.idNumber,
         role: formData.role,
@@ -79,7 +81,7 @@ export default function RegisterPage() {
       // 3. If the role is Admin or Employee, grant dashboard access via roles_admin
       if (formData.role === 'Admin' || formData.role === 'Employee') {
         await setDoc(doc(db, 'roles_admin', newUser.uid), {
-          email: formData.email,
+          email: normalizedEmail,
           assignedAt: new Date().toISOString(),
           role: formData.role
         });

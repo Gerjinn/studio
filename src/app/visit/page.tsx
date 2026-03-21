@@ -49,10 +49,30 @@ export default function VisitPage() {
         return;
       }
 
-      setEmail(user.email);
+      const normalizedEmail = user.email.toLowerCase();
+      
+      // Verification check immediately after Google login
+      const profilesRef = collection(db, 'userProfiles');
+      const q = query(profilesRef, where('institutionalEmail', '==', normalizedEmail), limit(1));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        await signOut(auth);
+        setError("Your institutional account is authenticated, but no visitor profile was found. Please register with the library staff.");
+        return;
+      }
+
+      const userProfile = querySnapshot.docs[0].data();
+      if (userProfile.accountStatus === 'blocked') {
+        await signOut(auth);
+        setError("ACCESS DENIED: Your library privileges have been suspended. Please contact the administrator.");
+        return;
+      }
+
+      setEmail(normalizedEmail);
       toast({
         title: "Authenticated",
-        description: `Signed in as ${user.displayName}. Please select your purpose and submit.`,
+        description: `Welcome back, ${user.displayName}. Please select your purpose and submit.`,
       });
     } catch (err: any) {
       if (err.code !== 'auth/popup-closed-by-user') {
@@ -70,14 +90,19 @@ export default function VisitPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!selectedPurpose || !email.includes('@neu.edu.ph')) return;
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    if (!selectedPurpose || !normalizedEmail.endsWith('@neu.edu.ph')) {
+      setError("Please provide a valid @neu.edu.ph institutional email.");
+      return;
+    }
 
     setIsSubmitting(true);
 
     try {
       // 1. Find User Profile by Email
       const profilesRef = collection(db, 'userProfiles');
-      const q = query(profilesRef, where('institutionalEmail', '==', email), limit(1));
+      const q = query(profilesRef, where('institutionalEmail', '==', normalizedEmail), limit(1));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
@@ -88,8 +113,9 @@ export default function VisitPage() {
 
       const userProfile = querySnapshot.docs[0].data();
       
+      // CRITICAL: Strict block enforcement
       if (userProfile.accountStatus === 'blocked') {
-        setError("Your account has been restricted. Please contact the library administrator.");
+        setError("Your account is currently BLOCKED from library entry. Please visit the help desk for assistance.");
         setIsSubmitting(false);
         return;
       }
@@ -172,10 +198,10 @@ export default function VisitPage() {
         </div>
 
         {error && (
-          <Alert variant="destructive" className="mb-8 border-destructive/20 bg-destructive/10">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Action Required</AlertTitle>
-            <AlertDescription className="flex flex-col gap-2">
+          <Alert variant="destructive" className="mb-8 border-destructive/20 bg-destructive/10 animate-in fade-in slide-in-from-top-4">
+            <AlertCircle className="h-5 w-5" />
+            <AlertTitle className="font-bold text-lg">Verification Failed</AlertTitle>
+            <AlertDescription className="text-base font-medium">
               {error}
             </AlertDescription>
           </Alert>
