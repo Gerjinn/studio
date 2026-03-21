@@ -266,7 +266,7 @@ export default function DashboardPage() {
               <TableHeader className="bg-white/5">
                 <TableRow className="border-white/5">
                   <TableHead className="text-white">Visitor</TableHead>
-                  <TableHead className="text-white">Time</TableHead>
+                  <TableHead className="text-white">Entry Time</TableHead>
                   <TableHead className="text-white">Purpose</TableHead>
                 </TableRow>
               </TableHeader>
@@ -274,7 +274,12 @@ export default function DashboardPage() {
                 {recentVisits.map((v) => (
                   <TableRow key={v.id} className="border-white/5">
                     <TableCell className="text-white font-medium">{v.visitorFullName}</TableCell>
-                    <TableCell className="text-muted-foreground">{v.entryTime ? format(parseISO(v.entryTime), 'h:mm a') : 'N/A'}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="text-white font-medium">{v.entryTime ? format(parseISO(v.entryTime), 'h:mm a') : 'N/A'}</span>
+                        <span className="text-[10px] text-muted-foreground">{v.entryTime ? format(parseISO(v.entryTime), 'MMMM d, yyyy') : ''}</span>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-primary font-bold">{v.categorizedPurpose || v.purpose}</TableCell>
                   </TableRow>
                 ))}
