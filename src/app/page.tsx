@@ -1,4 +1,3 @@
-
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -10,7 +9,7 @@ export default function WelcomePage() {
       <div className="mb-12 flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-700">
         <Logo className="w-32 h-32 mb-6 shadow-2xl shadow-primary/20" />
         <h1 className="text-5xl font-bold tracking-tight text-white sm:text-7xl font-headline">
-          Welcome to <span className="text-primary">EpochReads</span>
+          Welcome to <span className="text-primary">NEU Library!</span>
         </h1>
         <p className="mt-4 text-xl text-muted-foreground max-w-lg">
           Official Library Visitor Log of New Era University. Please sign in to log your visit.
