@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useMemo, useEffect, useState } from 'react';
@@ -12,7 +13,8 @@ import {
   Loader2,
   CalendarDays,
   ChevronRight,
-  Info
+  Info,
+  CheckCircle2
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -65,11 +67,24 @@ export default function DashboardPage() {
   // Track if a specific quick filter is active for UI highlighting
   const [activeFilter, setActiveFilter] = useState<'today' | 'week' | 'month' | null>(null);
 
+  // Welcome state for login greeting
+  const [showWelcome, setShowWelcome] = useState(false);
+
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/admin/login');
     }
   }, [user, isUserLoading, router]);
+
+  // Handle welcome greeting on dashboard mount
+  useEffect(() => {
+    if (user && sessionStorage.getItem('just_logged_in') === 'true') {
+      setShowWelcome(true);
+      sessionStorage.removeItem('just_logged_in');
+      const timer = setTimeout(() => setShowWelcome(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
 
   const visitsQuery = useMemoFirebase(() => {
     if (!user) return null;
@@ -208,7 +223,22 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen flex bg-[#1a2c38]">
       <AdminSidebar />
-      <main className="flex-1 ml-72 p-8">
+      <main className="flex-1 ml-72 p-8 relative">
+        {/* Centered Welcome Greeting Overlay */}
+        {showWelcome && user && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none px-4">
+            <div className="bg-card/90 backdrop-blur-xl p-8 rounded-2xl border border-white/10 shadow-2xl text-center animate-in zoom-in duration-500 max-w-sm w-full">
+              <div className="flex justify-center mb-4">
+                <div className="rounded-full bg-primary/20 p-4">
+                  <CheckCircle2 className="h-12 w-12 text-primary" />
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2 font-headline tracking-tight">Welcome to Admin Portal</h2>
+              <p className="text-white/60 text-sm font-medium">Admin ({user.email})</p>
+            </div>
+          </div>
+        )}
+
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold font-headline text-white">Dashboard Overview</h1>

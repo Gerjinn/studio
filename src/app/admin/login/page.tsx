@@ -1,13 +1,13 @@
 
 "use client"
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/Logo';
-import { ShieldAlert, ArrowLeft, Loader2, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useAuth, useUser, useFirestore } from '@/firebase';
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
@@ -18,7 +18,7 @@ export default function AdminLoginPage() {
   const router = useRouter();
   const auth = useAuth();
   const db = useFirestore();
-  const { user, isUserLoading } = useUser();
+  const { isUserLoading } = useUser();
   const { toast } = useToast();
   
   const [email, setEmail] = useState('');
@@ -26,8 +26,6 @@ export default function AdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(false);
-  const [loggedInEmail, setLoggedInEmail] = useState('');
 
   /**
    * Comprehensive authorization check:
@@ -84,11 +82,9 @@ export default function AdminLoginPage() {
           description: "This account is either unauthorized or has been suspended by an administrator.",
         });
       } else {
-        setLoggedInEmail(result.user.email || '');
-        setShowWelcome(true);
-        setTimeout(() => {
-          router.push('/admin/dashboard');
-        }, 2000);
+        // Mark that we just logged in for the welcome animation
+        sessionStorage.setItem('just_logged_in', 'true');
+        router.push('/admin/dashboard');
       }
     } catch (error: any) {
       toast({
@@ -132,11 +128,8 @@ export default function AdminLoginPage() {
         return;
       }
 
-      setLoggedInEmail(user.email || '');
-      setShowWelcome(true);
-      setTimeout(() => {
-        router.push('/admin/dashboard');
-      }, 2000);
+      sessionStorage.setItem('just_logged_in', 'true');
+      router.push('/admin/dashboard');
     } catch (error: any) {
       if (error.code !== 'auth/popup-closed-by-user') {
         toast({
@@ -154,25 +147,6 @@ export default function AdminLoginPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#1a2c38]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (showWelcome) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center neu-gradient p-4 text-center">
-        <div className="animate-in zoom-in duration-500">
-          <div className="flex justify-center mb-6">
-            <div className="rounded-full bg-primary/20 p-6 shadow-2xl shadow-primary/10">
-              <CheckCircle2 className="h-20 w-20 text-primary" />
-            </div>
-          </div>
-          <h2 className="text-5xl font-black text-white mb-2 font-headline tracking-tight">Welcome to Admin Portal</h2>
-          <p className="text-white/60 text-lg font-medium">Admin ({loggedInEmail})</p>
-          <div className="mt-8">
-            <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
-          </div>
-        </div>
       </div>
     );
   }
