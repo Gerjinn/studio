@@ -76,6 +76,7 @@ Categorize this description into one of the following predefined categories:
 /**
  * Defines the Genkit flow that orchestrates the AI purpose categorization process.
  * It takes the free-text description, passes it to the prompt, and returns the categorized purpose.
+ * Includes a try/catch block to handle API errors (like quota exhaustion) by falling back to 'Other'.
  */
 const aiPurposeCategorizationFlow = ai.defineFlow(
   {
@@ -84,12 +85,18 @@ const aiPurposeCategorizationFlow = ai.defineFlow(
     outputSchema: AIPurposeCategorizationOutputSchema,
   },
   async (input) => {
-    const { output } = await categorizePurposePrompt(input);
-    // Ensure output is not null, as Genkit types allow it but it should always be present for successful prompts.
-    if (!output) {
-      throw new Error('Failed to categorize visit purpose: AI output was null.');
+    try {
+      const { output } = await categorizePurposePrompt(input);
+      // Ensure output is not null, as Genkit types allow it but it should always be present for successful prompts.
+      if (!output) {
+        return { categorizedPurpose: 'Other' };
+      }
+      return output;
+    } catch (error) {
+      // In case of quota exhaustion (429) or other AI errors, return 'Other' as a fallback
+      // so the visitor log can proceed without failing.
+      return { categorizedPurpose: 'Other' };
     }
-    return output;
   }
 );
 

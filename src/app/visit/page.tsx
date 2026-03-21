@@ -122,8 +122,13 @@ export default function VisitPage() {
       // 2. AI Categorization if "Other"
       let finalCategorizedPurpose = selectedPurpose;
       if (selectedPurpose === 'Other' && otherDescription) {
-        const aiResult = await categorizeVisitPurpose({ otherPurposeDescription: otherDescription });
-        finalCategorizedPurpose = aiResult.categorizedPurpose;
+        try {
+          const aiResult = await categorizeVisitPurpose({ otherPurposeDescription: otherDescription });
+          finalCategorizedPurpose = aiResult.categorizedPurpose;
+        } catch (err) {
+          // Robust fallback: if AI fails (e.g. quota limit), use the original selection
+          finalCategorizedPurpose = selectedPurpose;
+        }
       }
       
       // 3. Log Visit
