@@ -81,7 +81,8 @@ export default function DashboardPage() {
     if (user && sessionStorage.getItem('just_logged_in') === 'true') {
       setShowWelcome(true);
       sessionStorage.removeItem('just_logged_in');
-      const timer = setTimeout(() => setShowWelcome(false), 3000);
+      // Set to 1.5 seconds as requested
+      const timer = setTimeout(() => setShowWelcome(false), 1500);
       return () => clearTimeout(timer);
     }
   }, [user]);
@@ -224,17 +225,20 @@ export default function DashboardPage() {
     <div className="min-h-screen flex bg-[#1a2c38]">
       <AdminSidebar />
       <main className="flex-1 ml-72 p-8 relative">
-        {/* Centered Welcome Greeting Overlay */}
+        {/* Centered Welcome Greeting Overlay - Reduced to 1.5s */}
         {showWelcome && user && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none px-4">
-            <div className="bg-card/90 backdrop-blur-xl p-8 rounded-2xl border border-white/10 shadow-2xl text-center animate-in zoom-in duration-500 max-w-sm w-full">
+            <div className="bg-card/95 backdrop-blur-2xl p-10 rounded-2xl border border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.5)] text-center animate-in zoom-in fade-in duration-300 max-w-sm w-full">
               <div className="flex justify-center mb-4">
-                <div className="rounded-full bg-primary/20 p-4">
+                <div className="rounded-full bg-primary/20 p-4 animate-bounce">
                   <CheckCircle2 className="h-12 w-12 text-primary" />
                 </div>
               </div>
               <h2 className="text-2xl font-bold text-white mb-2 font-headline tracking-tight">Welcome to Admin Portal</h2>
-              <p className="text-white/60 text-sm font-medium">Admin ({user.email})</p>
+              <div className="space-y-1">
+                <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">Administrator Account</p>
+                <p className="text-primary text-sm font-black truncate px-2">{user.email}</p>
+              </div>
             </div>
           </div>
         )}
