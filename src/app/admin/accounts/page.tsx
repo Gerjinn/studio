@@ -467,7 +467,7 @@ export default function AccountManagementPage() {
                   />
                 </div>
 
-                {/* Password Management Section */}
+                {/* Password Management Section - Secure "Manual" Process */}
                 <div className="pt-4 border-t border-white/10">
                   <div className="space-y-3">
                     <Label className="text-base font-bold flex items-center gap-2">
@@ -477,8 +477,8 @@ export default function AccountManagementPage() {
                     <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
-                          <p className="text-sm font-medium">Reset Password</p>
-                          <p className="text-[10px] text-muted-foreground">Send reset link to user email</p>
+                          <p className="text-sm font-medium">Update User Password</p>
+                          <p className="text-[10px] text-muted-foreground">Send secure update link to user</p>
                         </div>
                         <Button 
                           type="button"
@@ -489,12 +489,14 @@ export default function AccountManagementPage() {
                           className="bg-white/5 border-white/10 hover:bg-white/10 gap-2"
                         >
                           {isSendingReset ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mail className="h-3 w-3" />}
-                          Send Link
+                          Send Reset Link
                         </Button>
                       </div>
-                      <p className="text-[10px] text-white/40 italic">
-                        * For security, passwords must be chosen by the user via email link.
-                      </p>
+                      <div className="p-3 rounded-lg bg-black/20">
+                        <p className="text-[11px] text-white/60 leading-relaxed italic">
+                          <span className="font-bold text-primary not-italic">Note:</span> For institutional security, administrators trigger password updates via this link. The user will receive an email to choose their new secret password securely.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
