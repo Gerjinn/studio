@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useMemo } from 'react';
@@ -18,9 +19,8 @@ import {
   Trash2,
   Filter,
   AlertTriangle,
-  Key,
-  Eye,
-  EyeOff
+  Mail,
+  ShieldAlert
 } from 'lucide-react';
 import { 
   Table, 
@@ -58,8 +58,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking, useUser, useAuth } from '@/firebase';
 import { collection, query, doc } from 'firebase/firestore';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { COLLEGES } from '@/lib/mock-data';
@@ -71,9 +72,10 @@ export default function AccountManagementPage() {
   const [editingUser, setEditingUser] = useState<any>(null);
   const [userToDelete, setUserToDelete] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   
   const db = useFirestore();
+  const auth = useAuth();
   const { user: currentUser, isUserLoading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
@@ -148,12 +150,32 @@ export default function AccountManagementPage() {
     }
   };
 
+  const handleTriggerReset = async () => {
+    if (!editingUser?.institutionalEmail) return;
+    setIsResetting(true);
+    try {
+      await sendPasswordResetEmail(auth, editingUser.institutionalEmail);
+      toast({
+        title: "Reset Link Sent",
+        description: `A secure password reset link has been sent to ${editingUser.institutionalEmail}.`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Reset Failed",
+        description: error.message || "Could not send reset email.",
+      });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   const handleUpdateUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
 
     const userRef = doc(db, 'userProfiles', editingUser.id);
-    const { id, newPassword, ...updateData } = editingUser;
+    const { id, ...updateData } = editingUser;
     
     updateDocumentNonBlocking(userRef, updateData);
     
@@ -165,19 +187,11 @@ export default function AccountManagementPage() {
       handleToggleAdmin(id, editingUser.institutionalEmail, currentHasStaffAccess);
     }
     
-    if (newPassword) {
-      toast({
-        title: "Manual Password Update Triggered",
-        description: `Profile updated. Manual password change for ${editingUser.fullName} has been requested.`,
-      });
-    } else {
-      toast({
-        title: "Profile Updated",
-        description: `${editingUser.fullName}'s profile has been saved.`,
-      });
-    }
+    toast({
+      title: "Profile Updated",
+      description: `${editingUser.fullName}'s profile has been saved.`,
+    });
     setEditingUser(null);
-    setShowNewPassword(false);
   };
 
   const confirmDelete = () => {
@@ -451,36 +465,28 @@ export default function AccountManagementPage() {
                   />
                 </div>
 
-                {/* Password Management Section - Manual Override UI */}
+                {/* Secure Password Management Section */}
                 <div className="pt-4 border-t border-white/10">
                   <div className="space-y-3">
                     <Label className="text-base font-bold flex items-center gap-2">
-                      <Key className="h-4 w-4 text-primary" />
+                      <Mail className="h-4 w-4 text-primary" />
                       Security & Access
                     </Label>
                     <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="manual-password">Manual Password Reset</Label>
-                        <div className="relative">
-                          <Input 
-                            id="manual-password"
-                            type={showNewPassword ? "text" : "password"}
-                            placeholder="Type new password manually..."
-                            className="bg-black/20 border-white/10 pr-10"
-                            value={editingUser.newPassword || ''}
-                            onChange={(e) => setEditingUser({...editingUser, newPassword: e.target.value})}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowNewPassword(!showNewPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
-                          >
-                            {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </button>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground leading-tight italic">
-                          Enter a new password here to manually override the user's current access.
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          For security, Firebase prevents administrators from manually typing new passwords for other users. To reset this account's access, send a secure reset link to their institutional email.
                         </p>
+                        <Button 
+                          type="button" 
+                          variant="secondary" 
+                          className="w-full gap-2 font-bold"
+                          onClick={handleTriggerReset}
+                          disabled={isResetting}
+                        >
+                          {isResetting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                          Trigger Secure Reset Email
+                        </Button>
                       </div>
                     </div>
                   </div>

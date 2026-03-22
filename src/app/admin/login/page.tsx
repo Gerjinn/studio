@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from 'react';
@@ -6,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/Logo';
-import { ArrowLeft, Loader2, Eye, EyeOff, AlertCircle, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Loader2, Eye, EyeOff, AlertCircle, ShieldAlert, Key } from 'lucide-react';
 import { useAuth, useUser, useFirestore } from '@/firebase';
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
@@ -96,8 +97,6 @@ export default function AdminLoginPage() {
         }
       } else if (error.code === 'auth/too-many-requests') {
         errorMessage = "Too many failed attempts. Please try again later.";
-      } else if (error.code === 'auth/network-request-failed') {
-        errorMessage = "Network error. Please check your internet connection.";
       }
       
       setAuthErrorMessage(errorMessage);
@@ -145,6 +144,30 @@ export default function AdminLoginPage() {
       }
     } finally {
       setIsGoogleLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email || !email.includes('@neu.edu.ph')) {
+      toast({
+        variant: "destructive",
+        title: "Email Required",
+        description: "Please enter your @neu.edu.ph email first.",
+      });
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email.trim().toLowerCase());
+      toast({
+        title: "Reset Email Sent",
+        description: "Please check your inbox for the password reset link.",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Could not send reset link.",
+      });
     }
   };
 
@@ -237,7 +260,17 @@ export default function AdminLoginPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-white/80">Password</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium text-white/80">Password</label>
+                  <Button 
+                    type="button" 
+                    variant="link" 
+                    onClick={handleForgotPassword}
+                    className="h-auto p-0 text-xs text-primary hover:text-primary/80 font-bold"
+                  >
+                    Forgot Password?
+                  </Button>
+                </div>
                 <div className="relative">
                   <Input
                     type={showPassword ? "text" : "password"}
