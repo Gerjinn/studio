@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/Logo';
-import { ArrowLeft, Loader2, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, Eye, EyeOff, AlertCircle, ShieldAlert } from 'lucide-react';
 import { useAuth, useUser, useFirestore } from '@/firebase';
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
@@ -95,16 +95,16 @@ export default function AdminLoginPage() {
       let errorMessage = "Invalid credentials or account restriction.";
       
       // Handle the generic invalid-credential error which covers wrong password and non-existent users
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
         if (normalizedEmail === 'gerjinn.yallung@neu.edu.ph') {
-          errorMessage = "Account not found or invalid password. Please use 'Sign in with Google' to initialize your master administrator session.";
+          errorMessage = "Master Account Note: If you haven't set a manual password yet, please use 'Sign in with Google' to access your portal.";
         } else {
           errorMessage = "Invalid email or password. Please verify your credentials or contact your supervisor.";
         }
-      } else if (error.code === 'auth/wrong-password') {
-        errorMessage = "Incorrect password. Please try again.";
       } else if (error.code === 'auth/too-many-requests') {
         errorMessage = "Too many failed attempts. Please try again later.";
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = "Network error. Please check your internet connection.";
       }
       
       setAuthErrorMessage(errorMessage);
@@ -194,16 +194,16 @@ export default function AdminLoginPage() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Action Required</AlertTitle>
             <AlertDescription className="text-sm">
-              This domain is not authorized. Please go to the Firebase Console &gt; Authentication &gt; Settings &gt; Authorized Domains and add: <br/>
+              This domain is not authorized. Please go to the Firebase Console > Authentication > Settings > Authorized Domains and add: <br/>
               <code className="bg-black/40 px-1 rounded mt-1 inline-block">{typeof window !== 'undefined' ? window.location.hostname : 'your-domain.com'}</code>
             </AlertDescription>
           </Alert>
         )}
 
         {authErrorMessage && !domainError && (
-          <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-white">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Login Error</AlertTitle>
+          <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-white animate-in slide-in-from-top-2">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertTitle>Authentication Alert</AlertTitle>
             <AlertDescription className="text-sm">
               {authErrorMessage}
             </AlertDescription>
@@ -223,7 +223,7 @@ export default function AdminLoginPage() {
           <CardContent className="space-y-6">
             <Button 
               variant="outline" 
-              className="w-full h-12 bg-white text-black hover:bg-gray-100 border-none flex items-center justify-center gap-3 font-bold"
+              className="w-full h-12 bg-white text-black hover:bg-gray-100 border-none flex items-center justify-center gap-3 font-bold shadow-lg"
               onClick={handleGoogleLogin}
               disabled={isGoogleLoading}
             >
@@ -284,7 +284,7 @@ export default function AdminLoginPage() {
 
               <Button 
                 type="submit" 
-                className="w-full h-12 text-lg font-bold"
+                className="w-full h-12 text-lg font-bold shadow-xl shadow-primary/20"
                 disabled={!email.toLowerCase().includes('@neu.edu.ph') || isLoading}
               >
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Secure Login'}
