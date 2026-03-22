@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState } from 'react';
@@ -153,11 +152,15 @@ export default function VisitPage() {
       setShowSuccess(true);
       setTimeout(() => router.push('/'), 3000);
     } catch (err: any) {
-      toast({
-        variant: "destructive",
-        title: "Submission Error",
-        description: err.message || "Failed to record your visit.",
-      });
+      if (err.code === 'auth/unauthorized-domain') {
+        setDomainError(true);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Submission Error",
+          description: err.message || "Failed to record your visit.",
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }

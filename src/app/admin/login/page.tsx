@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState } from 'react';
@@ -94,8 +93,9 @@ export default function AdminLoginPage() {
       console.error("Login Error:", error);
       let errorMessage = "Invalid credentials or account restriction.";
       
-      // Handle the generic invalid-credential error which covers wrong password and non-existent users
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+      if (error.code === 'auth/unauthorized-domain') {
+        setDomainError(true);
+      } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
         if (normalizedEmail === 'gerjinn.yallung@neu.edu.ph') {
           errorMessage = "Master Account Note: If you haven't set a manual password yet, please use 'Sign in with Google' to access your portal.";
         } else {
@@ -194,7 +194,7 @@ export default function AdminLoginPage() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Action Required</AlertTitle>
             <AlertDescription className="text-sm">
-              This domain is not authorized. Please go to the Firebase Console > Authentication > Settings > Authorized Domains and add: <br/>
+              This domain is not authorized. Please go to the Firebase Console &gt; Authentication &gt; Settings &gt; Authorized Domains and add: <br/>
               <code className="bg-black/40 px-1 rounded mt-1 inline-block">{typeof window !== 'undefined' ? window.location.hostname : 'your-domain.com'}</code>
             </AlertDescription>
           </Alert>
