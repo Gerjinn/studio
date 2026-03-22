@@ -32,17 +32,12 @@ export default function VisitPage() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [domainError, setDomainError] = useState(false);
 
-  /**
-   * Enhanced Google Sign In:
-   * 1. Authenticates user.
-   * 2. Verifies institutional domain (@neu.edu.ph).
-   * 3. Auto-provisions a UserProfile if one doesn't exist (Zero-Admin hurdle).
-   * 4. Enforces block status if profile exists.
-   */
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     setError(null);
+    setDomainError(false);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
@@ -52,39 +47,30 @@ export default function VisitPage() {
 
       if (!user.email?.toLowerCase().endsWith('@neu.edu.ph')) {
         await signOut(auth);
-        setError("Only @neu.edu.ph institutional Google accounts are permitted. Please visit the help desk/admin for assistance.");
+        setError("Only @neu.edu.ph institutional Google accounts are permitted.");
         return;
       }
 
       const normalizedEmail = user.email.toLowerCase();
-      
-      // Check for existing profile
       const profileRef = doc(db, 'userProfiles', user.uid);
       const profileSnap = await getDoc(profileRef);
 
       if (!profileSnap.exists()) {
-        // Auto-provision profile for valid institutional user
-        // This removes the need for manual admin registration for Google users
         await setDoc(profileRef, {
           id: user.uid,
           institutionalEmail: normalizedEmail,
           fullName: user.displayName || 'NEU Visitor',
           idNumber: 'AUTO-PROVISIONED',
-          role: 'Student', // Default role
-          college: 'Unassigned', // Default college
+          role: 'Student',
+          college: 'Unassigned',
           accountStatus: 'active',
           createdAt: new Date().toISOString()
-        });
-        
-        toast({
-          title: "Profile Initialized",
-          description: "Your institutional visitor profile has been automatically created.",
         });
       } else {
         const userProfile = profileSnap.data();
         if (userProfile.accountStatus === 'blocked') {
           await signOut(auth);
-          setError("ACCESS DENIED: Your library privileges have been suspended. Please visit the help desk/admin for assistance.");
+          setError("ACCESS DENIED: Your library privileges have been suspended.");
           return;
         }
       }
@@ -96,12 +82,7 @@ export default function VisitPage() {
       });
     } catch (err: any) {
       if (err.code === 'auth/unauthorized-domain') {
-        toast({
-          variant: "destructive",
-          title: "Domain Not Authorized",
-          description: "This domain is not authorized for authentication. Please add it to the 'Authorized domains' list in the Firebase Console.",
-        });
-        setError("This domain is not authorized. Please check your Firebase Console settings.");
+        setDomainError(true);
       } else if (err.code !== 'auth/popup-closed-by-user') {
         toast({
           variant: "destructive",
@@ -127,27 +108,23 @@ export default function VisitPage() {
     setIsSubmitting(true);
 
     try {
-      // Find User Profile by Email
       const profilesRef = collection(db, 'userProfiles');
       const q = query(profilesRef, where('institutionalEmail', '==', normalizedEmail), limit(1));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        setError("Visitor profile not found. If using manual entry, an admin must register your account first. Try 'Quick Login with Google' for automatic entry.");
+        setError("Visitor profile not found. Please try 'Quick Login with Google' for automatic entry.");
         setIsSubmitting(false);
         return;
       }
 
       const userProfile = querySnapshot.docs[0].data();
-      
-      // Strict block enforcement
       if (userProfile.accountStatus === 'blocked') {
-        setError("Your account is currently BLOCKED from library entry. Please visit the help desk/admin for assistance.");
+        setError("Your account is currently BLOCKED from library entry.");
         setIsSubmitting(false);
         return;
       }
 
-      // AI Categorization if "Other"
       let finalCategorizedPurpose = selectedPurpose;
       if (selectedPurpose === 'Other' && otherDescription) {
         try {
@@ -158,7 +135,6 @@ export default function VisitPage() {
         }
       }
       
-      // Log Visit
       const visitLogsRef = collection(db, 'visitLogs');
       addDocumentNonBlocking(visitLogsRef, {
         visitorId: userProfile.id,
@@ -175,9 +151,7 @@ export default function VisitPage() {
       });
 
       setShowSuccess(true);
-      setTimeout(() => {
-        router.push('/');
-      }, 3000);
+      setTimeout(() => router.push('/'), 3000);
     } catch (err: any) {
       toast({
         variant: "destructive",
@@ -199,7 +173,7 @@ export default function VisitPage() {
             </div>
           </div>
           <h2 className="text-4xl font-bold text-white mb-2 font-headline">Thank you for your visit!</h2>
-          <p className="text-white/60 text-lg">Your entry has been recorded. Redirecting you shortly...</p>
+          <p className="text-white/60 text-lg">Your entry has been recorded. Redirecting shortly...</p>
         </div>
       </div>
     );
@@ -221,16 +195,27 @@ export default function VisitPage() {
       </header>
 
       <main className="container mx-auto max-w-3xl py-12 px-4">
+        {domainError && (
+          <Alert variant="destructive" className="mb-8 border-destructive/20 bg-destructive/10">
+            <AlertCircle className="h-5 w-5" />
+            <AlertTitle className="font-bold">Action Required</AlertTitle>
+            <AlertDescription>
+              This domain is not authorized. Please add this domain to the Firebase Console &gt; Authentication &gt; Settings &gt; Authorized Domains: <br/>
+              <code className="bg-black/20 px-1 rounded mt-1 inline-block">{typeof window !== 'undefined' ? window.location.hostname : 'your-domain.com'}</code>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="text-center mb-10">
           <h2 className="text-3xl font-bold mb-2 font-headline">Library Entry Log</h2>
           <p className="text-muted-foreground">Select your purpose of visit and identify yourself.</p>
         </div>
 
         {error && (
-          <Alert variant="destructive" className="mb-8 border-destructive/20 bg-destructive/10 animate-in fade-in slide-in-from-top-4">
+          <Alert variant="destructive" className="mb-8 border-destructive/20 bg-destructive/10">
             <AlertCircle className="h-5 w-5" />
-            <AlertTitle className="font-bold text-lg">Verification Failed</AlertTitle>
-            <AlertDescription className="text-base font-medium">
+            <AlertTitle className="font-bold">Verification Failed</AlertTitle>
+            <AlertDescription>
               {error}
             </AlertDescription>
           </Alert>
@@ -256,11 +241,11 @@ export default function VisitPage() {
           </div>
 
           {selectedPurpose === 'Other' && (
-            <div className="space-y-2 animate-in slide-in-from-top-2">
+            <div className="space-y-2">
               <Label htmlFor="otherDesc">Describe your purpose</Label>
               <Textarea
                 id="otherDesc"
-                placeholder="Briefly explain your reason for visiting..."
+                placeholder="Briefly explain your reason..."
                 value={otherDescription}
                 onChange={(e) => setOtherDescription(e.target.value)}
                 required
@@ -270,66 +255,50 @@ export default function VisitPage() {
           )}
 
           <div className="space-y-6 pt-6 border-t border-border/10">
-            <div className="space-y-4">
-               <Label className="text-lg font-medium">Identify Yourself</Label>
-               
-               <Button 
-                type="button"
-                variant="outline" 
-                className="w-full h-14 bg-white text-black hover:bg-gray-100 border-none flex items-center justify-center gap-3 font-bold shadow-md"
-                onClick={handleGoogleSignIn}
-                disabled={isGoogleLoading}
-              >
-                {isGoogleLoading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <svg className="w-6 h-6" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                  </svg>
-                )}
-                Quick Login with Google
-              </Button>
+             <Button 
+              type="button"
+              variant="outline" 
+              className="w-full h-14 bg-white text-black hover:bg-gray-100 border-none flex items-center justify-center gap-3 font-bold shadow-md"
+              onClick={handleGoogleSignIn}
+              disabled={isGoogleLoading}
+            >
+              {isGoogleLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
+                <svg className="w-6 h-6" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+              )}
+              Quick Login with Google
+            </Button>
 
-              <div className="flex items-center gap-4 py-2">
-                <Separator className="flex-1 bg-border/50" />
-                <span className="text-xs text-muted-foreground font-bold uppercase tracking-widest">or manual entry</span>
-                <Separator className="flex-1 bg-border/50" />
-              </div>
+            <div className="flex items-center gap-4">
+              <Separator className="flex-1" />
+              <span className="text-xs text-muted-foreground uppercase font-bold">or manual entry</span>
+              <Separator className="flex-1" />
+            </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-muted-foreground">Institutional Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="yourname@neu.edu.ph"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="h-14 text-lg bg-card border-border/50"
-                />
-                {!email.toLowerCase().includes('@neu.edu.ph') && email.length > 5 && (
-                  <p className="text-destructive text-sm font-medium">Only NEU institutional emails are accepted.</p>
-                )}
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-medium">Institutional Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="yourname@neu.edu.ph"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="h-14 bg-card border-border/50"
+              />
             </div>
 
             <Button 
               type="submit" 
               size="lg" 
-              className="w-full h-16 text-xl font-bold shadow-lg shadow-primary/20"
+              className="w-full h-16 text-xl font-bold"
               disabled={!selectedPurpose || !email.toLowerCase().includes('@neu.edu.ph') || isSubmitting}
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-                  Recording Entry...
-                </>
-              ) : (
-                'Submit Entry'
-              )}
+              {isSubmitting ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : 'Submit Entry'}
             </Button>
           </div>
         </form>
