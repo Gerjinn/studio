@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState } from 'react';
@@ -7,9 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/Logo';
-import { ArrowLeft, Loader2, Eye, EyeOff, AlertCircle, ShieldAlert, Key } from 'lucide-react';
+import { ArrowLeft, Loader2, Eye, EyeOff, AlertCircle, ShieldAlert } from 'lucide-react';
 import { useAuth, useUser, useFirestore } from '@/firebase';
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, sendPasswordResetEmail } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
@@ -147,30 +146,6 @@ export default function AdminLoginPage() {
     }
   };
 
-  const handleForgotPassword = async () => {
-    if (!email || !email.includes('@neu.edu.ph')) {
-      toast({
-        variant: "destructive",
-        title: "Email Required",
-        description: "Please enter your @neu.edu.ph email first.",
-      });
-      return;
-    }
-    try {
-      await sendPasswordResetEmail(auth, email.trim().toLowerCase());
-      toast({
-        title: "Reset Email Sent",
-        description: "Please check your inbox for the password reset link.",
-      });
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Could not send reset link.",
-      });
-    }
-  };
-
   if (isUserLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#1a2c38]">
@@ -194,7 +169,7 @@ export default function AdminLoginPage() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Action Required</AlertTitle>
             <AlertDescription className="text-sm">
-              This domain is not authorized. Please go to the Firebase Console &gt; Authentication &gt; Settings &gt; Authorized Domains and add: <br/>
+              This domain is not authorized. Please go to the Firebase Console {`>`} Authentication {`>`} Settings {`>`} Authorized Domains and add: <br/>
               <code className="bg-black/40 px-1 rounded mt-1 inline-block">{typeof window !== 'undefined' ? window.location.hostname : 'your-domain.com'}</code>
             </AlertDescription>
           </Alert>
@@ -262,14 +237,6 @@ export default function AdminLoginPage() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-sm font-medium text-white/80">Password</label>
-                  <Button 
-                    type="button" 
-                    variant="link" 
-                    onClick={handleForgotPassword}
-                    className="h-auto p-0 text-xs text-primary hover:text-primary/80 font-bold"
-                  >
-                    Forgot Password?
-                  </Button>
                 </div>
                 <div className="relative">
                   <Input
