@@ -23,7 +23,7 @@ export default function RegisterPage() {
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordToggle, setShowPasswordToggle] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -32,6 +32,8 @@ export default function RegisterPage() {
     role: 'Student',
     college: '',
   });
+
+  const isPasswordRequired = formData.role === 'Admin';
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +57,20 @@ export default function RegisterPage() {
       return;
     }
 
+    // If password is not required/visible, generate a random one for Firebase Auth creation
+    const registrationPassword = isPasswordRequired 
+      ? formData.password 
+      : Math.random().toString(36).slice(-12) + Math.random().toString(36).toUpperCase().slice(-4) + "!";
+
+    if (isPasswordRequired && !registrationPassword) {
+      toast({
+        variant: "destructive",
+        title: "Password Required",
+        description: "Admins must have an initial password set.",
+      });
+      return;
+    }
+
     setIsLoading(true);
     
     // Create a secondary app instance to prevent the admin from being logged out
@@ -64,7 +80,7 @@ export default function RegisterPage() {
 
     try {
       // 1. Create Auth User using the secondary instance
-      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, normalizedEmail, formData.password);
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, normalizedEmail, registrationPassword);
       const newUser = userCredential.user;
 
       // 2. Create User Profile in Firestore using the primary db instance
@@ -89,7 +105,7 @@ export default function RegisterPage() {
 
       toast({
         title: "Account Created",
-        description: "User profile and permissions have been initialized successfully.",
+        description: `Profile for ${formData.fullName} has been initialized successfully.`,
       });
       
       router.push('/admin/accounts');
@@ -163,31 +179,11 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-white/80">Initial Password</Label>
-                <div className="relative">
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    placeholder="••••••••"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="bg-black/20 border-white/10 text-white h-12 pr-12"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full w-12 text-white/40 hover:text-white hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
                 <Label className="text-white/80">Role</Label>
-                <Select onValueChange={(v) => setFormData({ ...formData, role: v })} defaultValue="Student">
+                <Select 
+                  onValueChange={(v) => setFormData({ ...formData, role: v, password: '' })} 
+                  defaultValue="Student"
+                >
                   <SelectTrigger className="bg-black/20 border-white/10 text-white h-12">
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
@@ -215,7 +211,38 @@ export default function RegisterPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {isPasswordRequired && (
+                <div className="space-y-2">
+                  <Label className="text-white/80">Initial Password</Label>
+                  <div className="relative">
+                    <Input
+                      type={showPasswordToggle ? "text" : "password"}
+                      required={isPasswordRequired}
+                      placeholder="••••••••"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      className="bg-black/20 border-white/10 text-white h-12 pr-12"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full w-12 text-white/40 hover:text-white hover:bg-transparent"
+                      onClick={() => setShowPasswordToggle(!showPasswordToggle)}
+                    >
+                      {showPasswordToggle ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
+
+            {!isPasswordRequired && (
+              <p className="text-xs text-white/40 text-center italic">
+                Note: Passwords are not required for Students, Faculty, or Employees as they check in via institutional email or Google.
+              </p>
+            )}
 
             <Button 
               type="submit" 
