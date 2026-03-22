@@ -28,15 +28,16 @@ export function AdminSidebar() {
   // Bootstrap logic for the main administrator only
   useEffect(() => {
     const BOOTSTRAP_ADMIN = 'gerjinn.yallung@neu.edu.ph';
+    const normalizedUserEmail = user?.email?.toLowerCase().trim();
     
-    if (!isUserLoading && user && user.email === BOOTSTRAP_ADMIN) {
+    if (!isUserLoading && user && normalizedUserEmail === BOOTSTRAP_ADMIN) {
       const profileRef = doc(db, 'userProfiles', user.uid);
       const adminRef = doc(db, 'roles_admin', user.uid);
       
       // Idempotent bootstrap: Ensure both profile and admin record exist for the master account
       setDocumentNonBlocking(profileRef, {
         id: user.uid,
-        institutionalEmail: user.email,
+        institutionalEmail: BOOTSTRAP_ADMIN,
         fullName: user.displayName || 'Main Administrator',
         idNumber: 'ADMIN-MASTER',
         role: 'Admin',
@@ -46,7 +47,7 @@ export function AdminSidebar() {
       }, { merge: true });
 
       setDocumentNonBlocking(adminRef, {
-        email: user.email,
+        email: BOOTSTRAP_ADMIN,
         assignedAt: new Date().toISOString(),
         isMaster: true
       }, { merge: true });

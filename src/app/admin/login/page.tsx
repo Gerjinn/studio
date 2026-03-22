@@ -28,28 +28,40 @@ export default function AdminLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [domainError, setDomainError] = useState(false);
+  const [authErrorMessage, setAuthErrorMessage] = useState<string | null>(null);
 
   const verifyAuthorization = async (uid: string, userEmail: string | null) => {
-    const normalizedEmail = userEmail?.toLowerCase() || '';
+    const normalizedEmail = userEmail?.toLowerCase().trim() || '';
+    
+    // Explicit Master Admin Override
     if (normalizedEmail === 'gerjinn.yallung@neu.edu.ph') return true;
     
-    const profilesRef = collection(db, 'userProfiles');
-    const profileQuery = query(profilesRef, where('institutionalEmail', '==', normalizedEmail), limit(1));
-    const profileSnap = await getDocs(profileQuery);
-    
-    if (!profileSnap.empty) {
-      const profile = profileSnap.docs[0].data();
-      if (profile.accountStatus === 'blocked') return false;
+    try {
+      // Check if user is blocked
+      const profilesRef = collection(db, 'userProfiles');
+      const profileQuery = query(profilesRef, where('institutionalEmail', '==', normalizedEmail), limit(1));
+      const profileSnap = await getDocs(profileQuery);
+      
+      if (!profileSnap.empty) {
+        const profile = profileSnap.docs[0].data();
+        if (profile.accountStatus === 'blocked') return false;
+      }
+      
+      // Check for admin role document
+      const adminRef = doc(db, 'roles_admin', uid);
+      const snap = await getDoc(adminRef);
+      return snap.exists();
+    } catch (error) {
+      console.error("Authorization check failed:", error);
+      // Fallback: if they are the master admin, allow them even if DB check fails (e.g. rules issues)
+      return normalizedEmail === 'gerjinn.yallung@neu.edu.ph';
     }
-    
-    const adminRef = doc(db, 'roles_admin', uid);
-    const snap = await getDoc(adminRef);
-    return snap.exists();
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setDomainError(false);
+    setAuthErrorMessage(null);
     const normalizedEmail = email.toLowerCase().trim();
     
     if (!normalizedEmail.endsWith('@neu.edu.ph')) {
@@ -68,20 +80,33 @@ export default function AdminLoginPage() {
       
       if (!authorized) {
         await signOut(auth);
+        setAuthErrorMessage("Access Restricted: This account is either unauthorized or has been suspended.");
         toast({
           variant: "destructive",
           title: "Access Restricted",
-          description: "This account is either unauthorized or has been suspended.",
+          description: "Your account does not have dashboard privileges.",
         });
       } else {
         sessionStorage.setItem('just_logged_in', 'true');
         router.push('/admin/dashboard');
       }
     } catch (error: any) {
+      console.error("Login Error:", error);
+      let errorMessage = "Invalid credentials or account restriction.";
+      
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = "No account found with this email. Please ensure your account has been registered by a supervisor.";
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = "Incorrect password. Please try again or contact your administrator.";
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = "Too many failed attempts. Please try again later or reset your password.";
+      }
+      
+      setAuthErrorMessage(errorMessage);
       toast({
         variant: "destructive",
         title: "Login Failed",
-        description: "Invalid credentials or account restriction.",
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);
@@ -91,13 +116,14 @@ export default function AdminLoginPage() {
   const handleGoogleLogin = async () => {
     setIsGoogleLoading(true);
     setDomainError(false);
+    setAuthErrorMessage(null);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
     try {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      const normalizedEmail = user.email?.toLowerCase() || '';
+      const normalizedEmail = user.email?.toLowerCase().trim() || '';
 
       if (!normalizedEmail.endsWith('@neu.edu.ph')) {
         await signOut(auth);
@@ -112,10 +138,11 @@ export default function AdminLoginPage() {
       const authorized = await verifyAuthorization(user.uid, normalizedEmail);
       if (!authorized) {
         await signOut(auth);
+        setAuthErrorMessage("Your dashboard access has been suspended or unauthorized.");
         toast({
           variant: "destructive",
           title: "Access Restricted",
-          description: "Your dashboard access has been suspended or unauthorized.",
+          description: "Dashboard access suspended.",
         });
         return;
       }
@@ -123,9 +150,11 @@ export default function AdminLoginPage() {
       sessionStorage.setItem('just_logged_in', 'true');
       router.push('/admin/dashboard');
     } catch (error: any) {
+      console.error("Google Auth Error:", error);
       if (error.code === 'auth/unauthorized-domain') {
         setDomainError(true);
       } else if (error.code !== 'auth/popup-closed-by-user') {
+        setAuthErrorMessage(error.message || "Could not sign in with Google.");
         toast({
           variant: "destructive",
           title: "Authentication Error",
@@ -162,6 +191,16 @@ export default function AdminLoginPage() {
             <AlertDescription className="text-sm">
               This domain is not authorized. Please go to the Firebase Console &gt; Authentication &gt; Settings &gt; Authorized Domains and add: <br/>
               <code className="bg-black/40 px-1 rounded mt-1 inline-block">{typeof window !== 'undefined' ? window.location.hostname : 'your-domain.com'}</code>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {authErrorMessage && !domainError && (
+          <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-white">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Login Error</AlertTitle>
+            <AlertDescription className="text-sm">
+              {authErrorMessage}
             </AlertDescription>
           </Alert>
         )}
@@ -241,7 +280,7 @@ export default function AdminLoginPage() {
               <Button 
                 type="submit" 
                 className="w-full h-12 text-lg font-bold"
-                disabled={!email.includes('@neu.edu.ph') || isLoading}
+                disabled={!email.toLowerCase().includes('@neu.edu.ph') || isLoading}
               >
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Secure Login'}
               </Button>
