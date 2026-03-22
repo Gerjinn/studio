@@ -53,7 +53,7 @@ export default function AdminLoginPage() {
       return snap.exists();
     } catch (error) {
       console.error("Authorization check failed:", error);
-      // Fallback: if they are the master admin, allow them even if DB check fails (e.g. rules issues)
+      // Fallback: if they are the master admin, allow them even if DB check fails
       return normalizedEmail === 'gerjinn.yallung@neu.edu.ph';
     }
   };
@@ -94,12 +94,17 @@ export default function AdminLoginPage() {
       console.error("Login Error:", error);
       let errorMessage = "Invalid credentials or account restriction.";
       
-      if (error.code === 'auth/user-not-found') {
-        errorMessage = "No account found with this email. Please ensure your account has been registered by a supervisor.";
+      // Handle the generic invalid-credential error which covers wrong password and non-existent users
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+        if (normalizedEmail === 'gerjinn.yallung@neu.edu.ph') {
+          errorMessage = "Account not found or invalid password. Please use 'Sign in with Google' to initialize your master administrator session.";
+        } else {
+          errorMessage = "Invalid email or password. Please verify your credentials or contact your supervisor.";
+        }
       } else if (error.code === 'auth/wrong-password') {
-        errorMessage = "Incorrect password. Please try again or contact your administrator.";
+        errorMessage = "Incorrect password. Please try again.";
       } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = "Too many failed attempts. Please try again later or reset your password.";
+        errorMessage = "Too many failed attempts. Please try again later.";
       }
       
       setAuthErrorMessage(errorMessage);
