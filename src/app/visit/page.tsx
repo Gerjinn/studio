@@ -95,7 +95,14 @@ export default function VisitPage() {
         description: `Welcome, ${user.displayName}. Please select your purpose and submit.`,
       });
     } catch (err: any) {
-      if (err.code !== 'auth/popup-closed-by-user') {
+      if (err.code === 'auth/unauthorized-domain') {
+        toast({
+          variant: "destructive",
+          title: "Domain Not Authorized",
+          description: "This domain is not authorized for authentication. Please add it to the 'Authorized domains' list in the Firebase Console.",
+        });
+        setError("This domain is not authorized. Please check your Firebase Console settings.");
+      } else if (err.code !== 'auth/popup-closed-by-user') {
         toast({
           variant: "destructive",
           title: "Authentication Error",

@@ -131,7 +131,13 @@ export default function AdminLoginPage() {
       sessionStorage.setItem('just_logged_in', 'true');
       router.push('/admin/dashboard');
     } catch (error: any) {
-      if (error.code !== 'auth/popup-closed-by-user') {
+      if (error.code === 'auth/unauthorized-domain') {
+        toast({
+          variant: "destructive",
+          title: "Domain Not Authorized",
+          description: "This domain is not authorized for authentication. Please add it to the 'Authorized domains' list in the Firebase Console.",
+        });
+      } else if (error.code !== 'auth/popup-closed-by-user') {
         toast({
           variant: "destructive",
           title: "Authentication Error",
