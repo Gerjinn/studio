@@ -1,19 +1,19 @@
-# Firebase Studio
+# My Link (https://studio--studio-9276369069-b05fa.us-central1.hosted.app)
 
-# 📚 NEU Library Visitor Log System
+# 📜 NEU Library Visitor Log System
 
 A modern, high-performance visitor tracking and management platform designed specifically for the **New Era University (NEU) Library**. Built with **Next.js 15, Firebase, and Tailwind CSS**, this system replaces traditional manual logbooks with a secure, data-driven digital solution.
 
 ---
 
-## 🌟 Overview
+## 📝 Overview
 The **NEU Library Visitor Log** streamlines the entry process for students and faculty while providing administrators with powerful real-time analytics. By digitizing visitor records, the library can now monitor footfall patterns, department-specific usage, and visit purposes with surgical precision.
 
 ---
 
-## 🚀 Key Features
+## 🔑 Key Features
 
-### 📱 Visitor Portal
+### 📟 Visitor Portal
 * **Swift Check-in:** A simple, mobile-ready interface that allows visitors to log in in seconds.
 * **Purpose Selection:** Categorized tracking for *Research, Assignments, Computer Use,* or *Board Games*.
 * **Institutional Validation:** Strictly limited to legitimate `@neu.edu.ph` email addresses to guarantee data integrity.
@@ -52,3 +52,15 @@ Use these to test visitor interactions (No password required for visitors):
 * `example.one@neu.edu.ph`
 * `example.two@neu.edu.ph`
 * `example.three@neu.edu.ph`
+
+---
+
+## 🛠️ Tech Stack
+
+The **NEU Library Visitor Log** is built with a modern, high-performance stack to ensure real-time data synchronization and a seamless user experience.
+
+* **Framework:** **Next.js 15 (App Router)** for optimized server-side rendering and efficient routing.
+* **Database:** **Firebase Firestore (Real-time NoSQL)** to provide instant updates to the Admin Dashboard as visitors check in.
+* **Authentication:** **Firebase Authentication** supporting secure Google Login and institutional Email/Password verification.
+* **Styling:** **Tailwind CSS** & **Shadcn UI** for a clean, responsive, and professional user interface.
+* **Charts:** **Recharts** to transform raw visitor data into dynamic, interactive visual insights.
