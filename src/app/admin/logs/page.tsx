@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { AdminSidebar } from '@/components/admin/Sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -43,11 +43,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking, useUser } from '@/firebase';
 import { collection, query, orderBy, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { COLLEGES } from '@/lib/mock-data';
 import { exportToExcel } from '@/lib/export-utils';
+import { useRouter } from 'next/navigation';
 
 export default function VisitorLogPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -57,11 +58,21 @@ export default function VisitorLogPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   
   const db = useFirestore();
+  const { user: currentUser, isUserLoading } = useUser();
   const { toast } = useToast();
+  const router = useRouter();
+
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!isUserLoading && !currentUser) {
+      router.push('/admin/login');
+    }
+  }, [currentUser, isUserLoading, router]);
 
   const visitsQuery = useMemoFirebase(() => {
+    if (!currentUser) return null;
     return query(collection(db, 'visitLogs'), orderBy('entryTime', 'desc'));
-  }, [db]);
+  }, [db, currentUser]);
 
   const { data: visits, isLoading } = useCollection(visitsQuery);
 
@@ -129,7 +140,7 @@ export default function VisitorLogPage() {
     });
   };
 
-  if (isLoading) {
+  if (isUserLoading || (currentUser && isLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#1a2c38]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

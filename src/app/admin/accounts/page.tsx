@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { AdminSidebar } from '@/components/admin/Sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -21,8 +21,7 @@ import {
   AlertTriangle,
   Lock,
   Eye,
-  EyeOff,
-  ShieldAlert
+  EyeOff
 } from 'lucide-react';
 import { 
   Table, 
@@ -84,13 +83,22 @@ export default function AccountManagementPage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!isUserLoading && !currentUser) {
+      router.push('/admin/login');
+    }
+  }, [currentUser, isUserLoading, router]);
+
   const accountsQuery = useMemoFirebase(() => {
+    if (!currentUser) return null;
     return query(collection(db, 'userProfiles'));
-  }, [db]);
+  }, [db, currentUser]);
 
   const adminsQuery = useMemoFirebase(() => {
+    if (!currentUser) return null;
     return query(collection(db, 'roles_admin'));
-  }, [db]);
+  }, [db, currentUser]);
 
   const { data: accounts, isLoading: isAccountsLoading } = useCollection(accountsQuery);
   const { data: admins, isLoading: isAdminsLoading } = useCollection(adminsQuery);
@@ -158,12 +166,9 @@ export default function AccountManagementPage() {
     e.preventDefault();
     if (!editingUser) return;
 
-    // Handle Manual Password Update if provided
     if (newPassword) {
       setIsUpdatingPassword(true);
       try {
-        // NOTE: Firebase Client SDK can only update the password of the CURRENTLY logged in user.
-        // To update another user's password, an admin reset link or Firebase Console is typically required.
         if (editingUser.id === currentUser?.uid) {
           await updatePassword(auth.currentUser!, newPassword);
           toast({
@@ -171,11 +176,10 @@ export default function AccountManagementPage() {
             description: "Your administrative password has been changed.",
           });
         } else {
-          // Since Client SDK cannot change another user's password directly:
           toast({
             variant: "destructive",
-            title: "Manual Reset Unavailable",
-            description: "For security, direct password overwrites for other users must be done in the Firebase Console.",
+            title: "Manual Overwrite Restricted",
+            description: "For security, changing passwords for other users must be done via a secure reset link or in the Firebase Console.",
           });
         }
       } catch (error: any) {
@@ -483,7 +487,6 @@ export default function AccountManagementPage() {
                   />
                 </div>
 
-                {/* Manual Password Override Section */}
                 <div className="pt-4 border-t border-white/10">
                   <div className="space-y-3">
                     <Label className="text-base font-bold flex items-center gap-2">
@@ -496,7 +499,7 @@ export default function AccountManagementPage() {
                         <div className="relative">
                           <Input 
                             type={showNewPassword ? "text" : "password"}
-                            placeholder="Type to override password..."
+                            placeholder="Type to overwrite password..."
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
                             className="bg-black/20 border-white/10 pr-10"
