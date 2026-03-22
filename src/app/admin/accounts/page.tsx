@@ -19,7 +19,9 @@ import {
   Trash2,
   Filter,
   AlertTriangle,
-  Mail,
+  Lock,
+  Eye,
+  EyeOff,
   ShieldAlert
 } from 'lucide-react';
 import { 
@@ -60,7 +62,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking, useUser, useAuth } from '@/firebase';
 import { collection, query, doc } from 'firebase/firestore';
-import { sendPasswordResetEmail } from 'firebase/auth';
+import { updatePassword } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { COLLEGES } from '@/lib/mock-data';
@@ -70,9 +72,11 @@ export default function AccountManagementPage() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [collegeFilter, setCollegeFilter] = useState('all');
   const [editingUser, setEditingUser] = useState<any>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [userToDelete, setUserToDelete] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   
   const db = useFirestore();
   const auth = useAuth();
@@ -150,36 +154,47 @@ export default function AccountManagementPage() {
     }
   };
 
-  const handleTriggerReset = async () => {
-    if (!editingUser?.institutionalEmail) return;
-    setIsResetting(true);
-    try {
-      await sendPasswordResetEmail(auth, editingUser.institutionalEmail);
-      toast({
-        title: "Reset Link Sent",
-        description: `A secure password reset link has been sent to ${editingUser.institutionalEmail}.`,
-      });
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Reset Failed",
-        description: error.message || "Could not send reset email.",
-      });
-    } finally {
-      setIsResetting(false);
-    }
-  };
-
-  const handleUpdateUser = (e: React.FormEvent) => {
+  const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
+
+    // Handle Manual Password Update if provided
+    if (newPassword) {
+      setIsUpdatingPassword(true);
+      try {
+        // NOTE: Firebase Client SDK can only update the password of the CURRENTLY logged in user.
+        // To update another user's password, an admin reset link or Firebase Console is typically required.
+        if (editingUser.id === currentUser?.uid) {
+          await updatePassword(auth.currentUser!, newPassword);
+          toast({
+            title: "Password Updated",
+            description: "Your administrative password has been changed.",
+          });
+        } else {
+          // Since Client SDK cannot change another user's password directly:
+          toast({
+            variant: "destructive",
+            title: "Manual Reset Unavailable",
+            description: "For security, direct password overwrites for other users must be done in the Firebase Console.",
+          });
+        }
+      } catch (error: any) {
+        toast({
+          variant: "destructive",
+          title: "Update Failed",
+          description: error.message || "Could not update password.",
+        });
+      } finally {
+        setIsUpdatingPassword(false);
+        setNewPassword('');
+      }
+    }
 
     const userRef = doc(db, 'userProfiles', editingUser.id);
     const { id, ...updateData } = editingUser;
     
     updateDocumentNonBlocking(userRef, updateData);
     
-    // Sync staff access: Admins and Employees should be in roles_admin
     const currentHasStaffAccess = adminUids.has(id);
     const shouldHaveStaffAccess = editingUser.role === 'Admin' || editingUser.role === 'Employee';
     
@@ -357,7 +372,10 @@ export default function AccountManagementPage() {
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          onClick={() => setEditingUser(account)}
+                          onClick={() => {
+                            setEditingUser(account);
+                            setNewPassword('');
+                          }}
                           className="text-white hover:bg-white/10"
                         >
                           <Settings className="h-4 w-4" />
@@ -465,28 +483,34 @@ export default function AccountManagementPage() {
                   />
                 </div>
 
-                {/* Secure Password Management Section */}
+                {/* Manual Password Override Section */}
                 <div className="pt-4 border-t border-white/10">
                   <div className="space-y-3">
                     <Label className="text-base font-bold flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-primary" />
+                      <Lock className="h-4 w-4 text-primary" />
                       Security & Access
                     </Label>
                     <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-4">
                       <div className="space-y-2">
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                          For security, Firebase prevents administrators from manually typing new passwords for other users. To reset this account's access, send a secure reset link to their institutional email.
-                        </p>
-                        <Button 
-                          type="button" 
-                          variant="secondary" 
-                          className="w-full gap-2 font-bold"
-                          onClick={handleTriggerReset}
-                          disabled={isResetting}
-                        >
-                          {isResetting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                          Trigger Secure Reset Email
-                        </Button>
+                        <Label>New Manual Password</Label>
+                        <div className="relative">
+                          <Input 
+                            type={showNewPassword ? "text" : "password"}
+                            placeholder="Type to override password..."
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            className="bg-black/20 border-white/10 pr-10"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-0 top-0 h-full w-10 text-white/40 hover:text-white"
+                            onClick={() => setShowNewPassword(!showNewPassword)}
+                          >
+                            {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -518,8 +542,8 @@ export default function AccountManagementPage() {
                   <Button type="button" variant="ghost" onClick={() => setEditingUser(null)} className="flex-1">
                     Cancel
                   </Button>
-                  <Button type="submit" className="flex-1 gap-2">
-                    <Save className="h-4 w-4" />
+                  <Button type="submit" className="flex-1 gap-2" disabled={isUpdatingPassword}>
+                    {isUpdatingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                     Save Changes
                   </Button>
                 </DialogFooter>
