@@ -51,8 +51,7 @@ export default function AdminLoginPage() {
       const snap = await getDoc(adminRef);
       return snap.exists();
     } catch (error) {
-      console.error("Authorization check failed:", error);
-      // Fallback: if they are the master admin, allow them even if DB check fails
+      // Silently handle authorization check failures by defaulting to master check
       return normalizedEmail === 'gerjinn.yallung@neu.edu.ph';
     }
   };
@@ -80,24 +79,18 @@ export default function AdminLoginPage() {
       if (!authorized) {
         await signOut(auth);
         setAuthErrorMessage("Access Restricted: This account is either unauthorized or has been suspended.");
-        toast({
-          variant: "destructive",
-          title: "Access Restricted",
-          description: "Your account does not have dashboard privileges.",
-        });
       } else {
         sessionStorage.setItem('just_logged_in', 'true');
         router.push('/admin/dashboard');
       }
     } catch (error: any) {
-      console.error("Login Error:", error);
       let errorMessage = "Invalid credentials or account restriction.";
       
       if (error.code === 'auth/unauthorized-domain') {
         setDomainError(true);
       } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
         if (normalizedEmail === 'gerjinn.yallung@neu.edu.ph') {
-          errorMessage = "Master Account Note: If you haven't set a manual password yet, please use 'Sign in with Google' to access your portal.";
+          errorMessage = "Master Account Note: If you haven't set a manual password yet, please use 'Sign in with Google' to access your portal for the first time.";
         } else {
           errorMessage = "Invalid email or password. Please verify your credentials or contact your supervisor.";
         }
@@ -108,11 +101,6 @@ export default function AdminLoginPage() {
       }
       
       setAuthErrorMessage(errorMessage);
-      toast({
-        variant: "destructive",
-        title: "Login Failed",
-        description: errorMessage,
-      });
     } finally {
       setIsLoading(false);
     }
@@ -144,27 +132,16 @@ export default function AdminLoginPage() {
       if (!authorized) {
         await signOut(auth);
         setAuthErrorMessage("Your dashboard access has been suspended or unauthorized.");
-        toast({
-          variant: "destructive",
-          title: "Access Restricted",
-          description: "Dashboard access suspended.",
-        });
         return;
       }
 
       sessionStorage.setItem('just_logged_in', 'true');
       router.push('/admin/dashboard');
     } catch (error: any) {
-      console.error("Google Auth Error:", error);
       if (error.code === 'auth/unauthorized-domain') {
         setDomainError(true);
       } else if (error.code !== 'auth/popup-closed-by-user') {
         setAuthErrorMessage(error.message || "Could not sign in with Google.");
-        toast({
-          variant: "destructive",
-          title: "Authentication Error",
-          description: error.message || "Could not sign in with Google.",
-        });
       }
     } finally {
       setIsGoogleLoading(false);
