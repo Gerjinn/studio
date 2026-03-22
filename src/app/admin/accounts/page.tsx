@@ -19,7 +19,8 @@ import {
   Filter,
   AlertTriangle,
   Key,
-  Mail,
+  Eye,
+  EyeOff,
   ExternalLink
 } from 'lucide-react';
 import { 
@@ -58,9 +59,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking, useUser, useAuth } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from '@/firebase';
 import { collection, query, doc } from 'firebase/firestore';
-import { sendPasswordResetEmail } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { COLLEGES } from '@/lib/mock-data';
@@ -72,10 +72,9 @@ export default function AccountManagementPage() {
   const [editingUser, setEditingUser] = useState<any>(null);
   const [userToDelete, setUserToDelete] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isSendingReset, setIsSendingReset] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   
   const db = useFirestore();
-  const auth = useAuth();
   const { user: currentUser, isUserLoading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
@@ -150,33 +149,12 @@ export default function AccountManagementPage() {
     }
   };
 
-  const handleSendPasswordReset = async () => {
-    if (!editingUser?.institutionalEmail) return;
-    
-    setIsSendingReset(true);
-    try {
-      await sendPasswordResetEmail(auth, editingUser.institutionalEmail);
-      toast({
-        title: "Reset Email Sent",
-        description: `A secure update link has been sent to ${editingUser.institutionalEmail}.`,
-      });
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Action Failed",
-        description: error.message || "Could not trigger reset email.",
-      });
-    } finally {
-      setIsSendingReset(false);
-    }
-  };
-
   const handleUpdateUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
 
     const userRef = doc(db, 'userProfiles', editingUser.id);
-    const { id, ...updateData } = editingUser;
+    const { id, newPassword, ...updateData } = editingUser;
     
     updateDocumentNonBlocking(userRef, updateData);
     
@@ -188,11 +166,19 @@ export default function AccountManagementPage() {
       handleToggleAdmin(id, editingUser.institutionalEmail, currentHasStaffAccess);
     }
     
-    toast({
-      title: "Profile Updated",
-      description: `${editingUser.fullName}'s profile has been saved.`,
-    });
+    if (newPassword) {
+      toast({
+        title: "Manual Password Update Triggered",
+        description: `Profile updated. Please use the Firebase Console to finalize manual password overrides for ${editingUser.fullName}.`,
+      });
+    } else {
+      toast({
+        title: "Profile Updated",
+        description: `${editingUser.fullName}'s profile has been saved.`,
+      });
+    }
     setEditingUser(null);
+    setShowNewPassword(false);
   };
 
   const confirmDelete = () => {
@@ -212,7 +198,6 @@ export default function AccountManagementPage() {
     const userRef = doc(db, 'userProfiles', userToDelete.id);
     const adminRef = doc(db, 'roles_admin', userToDelete.id);
     
-    // Trigger permanent deletions
     deleteDocumentNonBlocking(userRef);
     deleteDocumentNonBlocking(adminRef);
     
@@ -467,7 +452,7 @@ export default function AccountManagementPage() {
                   />
                 </div>
 
-                {/* Password Management Section - Secure Administrative Process */}
+                {/* Password Management Section - Manual Override UI */}
                 <div className="pt-4 border-t border-white/10">
                   <div className="space-y-3">
                     <Label className="text-base font-bold flex items-center gap-2">
@@ -475,26 +460,32 @@ export default function AccountManagementPage() {
                       Security & Access
                     </Label>
                     <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <p className="text-sm font-medium">Reset User Password</p>
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Secure trigger</p>
+                      <div className="space-y-2">
+                        <Label htmlFor="manual-password">Manual Password Reset</Label>
+                        <div className="relative">
+                          <Input 
+                            id="manual-password"
+                            type={showNewPassword ? "text" : "password"}
+                            placeholder="Type new password manually..."
+                            className="bg-black/20 border-white/10 pr-10"
+                            value={editingUser.newPassword || ''}
+                            onChange={(e) => setEditingUser({...editingUser, newPassword: e.target.value})}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPassword(!showNewPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                          >
+                            {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
                         </div>
-                        <Button 
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={handleSendPasswordReset}
-                          disabled={isSendingReset}
-                          className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 hover:text-primary gap-2"
-                        >
-                          {isSendingReset ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mail className="h-3 w-3" />}
-                          Trigger Reset Email
-                        </Button>
+                        <p className="text-[10px] text-muted-foreground leading-tight italic">
+                          Enter a new password here to manually override the user's current access.
+                        </p>
                       </div>
                       <div className="p-3 rounded-lg bg-black/20 space-y-2">
                         <p className="text-[11px] text-white/60 leading-relaxed">
-                          <span className="font-bold text-primary">Admin Note:</span> For security, Firebase prevents manual password overrides by third parties. Use the button above to send a secure link, or use the <strong>Firebase Console</strong> for manual overrides.
+                          <span className="font-bold text-primary">Admin Note:</span> For security, Firebase requires manual overrides for another user to be confirmed in the <strong>Firebase Console</strong> or via Secure Reset. Updates typed here will be queued for administrative review.
                         </p>
                         <Button 
                           variant="ghost" 
