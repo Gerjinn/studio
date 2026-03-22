@@ -20,8 +20,7 @@ import {
   AlertTriangle,
   Key,
   Eye,
-  EyeOff,
-  ExternalLink
+  EyeOff
 } from 'lucide-react';
 import { 
   Table, 
@@ -169,7 +168,7 @@ export default function AccountManagementPage() {
     if (newPassword) {
       toast({
         title: "Manual Password Update Triggered",
-        description: `Profile updated. Please use the Firebase Console to finalize manual password overrides for ${editingUser.fullName}.`,
+        description: `Profile updated. Manual password change for ${editingUser.fullName} has been requested.`,
       });
     } else {
       toast({
@@ -482,21 +481,6 @@ export default function AccountManagementPage() {
                         <p className="text-[10px] text-muted-foreground leading-tight italic">
                           Enter a new password here to manually override the user's current access.
                         </p>
-                      </div>
-                      <div className="p-3 rounded-lg bg-black/20 space-y-2">
-                        <p className="text-[11px] text-white/60 leading-relaxed">
-                          <span className="font-bold text-primary">Admin Note:</span> For security, Firebase requires manual overrides for another user to be confirmed in the <strong>Firebase Console</strong> or via Secure Reset. Updates typed here will be queued for administrative review.
-                        </p>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 text-[10px] text-primary/80 hover:text-primary p-0 gap-1"
-                          asChild
-                        >
-                          <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer">
-                            Open Firebase Console <ExternalLink className="h-2 w-2" />
-                          </a>
-                        </Button>
                       </div>
                     </div>
                   </div>
