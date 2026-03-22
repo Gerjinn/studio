@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useMemo } from 'react';
@@ -20,7 +19,8 @@ import {
   Filter,
   AlertTriangle,
   Key,
-  Mail
+  Mail,
+  ExternalLink
 } from 'lucide-react';
 import { 
   Table, 
@@ -158,13 +158,13 @@ export default function AccountManagementPage() {
       await sendPasswordResetEmail(auth, editingUser.institutionalEmail);
       toast({
         title: "Reset Email Sent",
-        description: `A password reset link has been sent to ${editingUser.institutionalEmail}.`,
+        description: `A secure update link has been sent to ${editingUser.institutionalEmail}.`,
       });
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Reset Failed",
-        description: error.message || "Could not send reset email.",
+        title: "Action Failed",
+        description: error.message || "Could not trigger reset email.",
       });
     } finally {
       setIsSendingReset(false);
@@ -467,18 +467,18 @@ export default function AccountManagementPage() {
                   />
                 </div>
 
-                {/* Password Management Section - Secure "Manual" Process */}
+                {/* Password Management Section - Secure Administrative Process */}
                 <div className="pt-4 border-t border-white/10">
                   <div className="space-y-3">
                     <Label className="text-base font-bold flex items-center gap-2">
                       <Key className="h-4 w-4 text-primary" />
-                      Security & Password
+                      Security & Access
                     </Label>
-                    <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-3">
+                    <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
-                          <p className="text-sm font-medium">Update User Password</p>
-                          <p className="text-[10px] text-muted-foreground">Send secure update link to user</p>
+                          <p className="text-sm font-medium">Reset User Password</p>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Secure trigger</p>
                         </div>
                         <Button 
                           type="button"
@@ -486,16 +486,26 @@ export default function AccountManagementPage() {
                           variant="outline"
                           onClick={handleSendPasswordReset}
                           disabled={isSendingReset}
-                          className="bg-white/5 border-white/10 hover:bg-white/10 gap-2"
+                          className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 hover:text-primary gap-2"
                         >
                           {isSendingReset ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mail className="h-3 w-3" />}
-                          Send Reset Link
+                          Trigger Reset Email
                         </Button>
                       </div>
-                      <div className="p-3 rounded-lg bg-black/20">
-                        <p className="text-[11px] text-white/60 leading-relaxed italic">
-                          <span className="font-bold text-primary not-italic">Note:</span> For institutional security, administrators trigger password updates via this link. The user will receive an email to choose their new secret password securely.
+                      <div className="p-3 rounded-lg bg-black/20 space-y-2">
+                        <p className="text-[11px] text-white/60 leading-relaxed">
+                          <span className="font-bold text-primary">Admin Note:</span> For security, Firebase prevents manual password overrides by third parties. Use the button above to send a secure link, or use the <strong>Firebase Console</strong> for manual overrides.
                         </p>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 text-[10px] text-primary/80 hover:text-primary p-0 gap-1"
+                          asChild
+                        >
+                          <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer">
+                            Open Firebase Console <ExternalLink className="h-2 w-2" />
+                          </a>
+                        </Button>
                       </div>
                     </div>
                   </div>
