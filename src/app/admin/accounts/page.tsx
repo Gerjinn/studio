@@ -18,7 +18,9 @@ import {
   Save,
   Trash2,
   Filter,
-  AlertTriangle
+  AlertTriangle,
+  Key,
+  Mail
 } from 'lucide-react';
 import { 
   Table, 
@@ -56,8 +58,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking, useUser, useAuth } from '@/firebase';
 import { collection, query, doc } from 'firebase/firestore';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { COLLEGES } from '@/lib/mock-data';
@@ -69,8 +72,10 @@ export default function AccountManagementPage() {
   const [editingUser, setEditingUser] = useState<any>(null);
   const [userToDelete, setUserToDelete] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSendingReset, setIsSendingReset] = useState(false);
   
   const db = useFirestore();
+  const auth = useAuth();
   const { user: currentUser, isUserLoading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
@@ -142,6 +147,27 @@ export default function AccountManagementPage() {
         title: "Privileges Granted",
         description: "User now has dashboard access.",
       });
+    }
+  };
+
+  const handleSendPasswordReset = async () => {
+    if (!editingUser?.institutionalEmail) return;
+    
+    setIsSendingReset(true);
+    try {
+      await sendPasswordResetEmail(auth, editingUser.institutionalEmail);
+      toast({
+        title: "Reset Email Sent",
+        description: `A password reset link has been sent to ${editingUser.institutionalEmail}.`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Reset Failed",
+        description: error.message || "Could not send reset email.",
+      });
+    } finally {
+      setIsSendingReset(false);
     }
   };
 
@@ -439,6 +465,38 @@ export default function AccountManagementPage() {
                     checked={adminUids.has(editingUser.id)} 
                     onCheckedChange={(checked) => handleToggleAdmin(editingUser.id, editingUser.institutionalEmail, !checked)}
                   />
+                </div>
+
+                {/* Password Management Section */}
+                <div className="pt-4 border-t border-white/10">
+                  <div className="space-y-3">
+                    <Label className="text-base font-bold flex items-center gap-2">
+                      <Key className="h-4 w-4 text-primary" />
+                      Security & Password
+                    </Label>
+                    <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-medium">Reset Password</p>
+                          <p className="text-[10px] text-muted-foreground">Send reset link to user email</p>
+                        </div>
+                        <Button 
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleSendPasswordReset}
+                          disabled={isSendingReset}
+                          className="bg-white/5 border-white/10 hover:bg-white/10 gap-2"
+                        >
+                          {isSendingReset ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mail className="h-3 w-3" />}
+                          Send Link
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-white/40 italic">
+                        * For security, passwords must be chosen by the user via email link.
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="pt-4 border-t border-white/10">
